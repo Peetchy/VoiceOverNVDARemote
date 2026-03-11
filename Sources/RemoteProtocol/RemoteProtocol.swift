@@ -564,6 +564,162 @@ public struct NewlineDelimitedJSONSerializer: Sendable {
 
     public func deserialize(_ data: Data) throws -> RemoteEnvelope {
         let trimmed = data.last == 0x0A ? data.dropLast() : data[...]
-        return try decoder.decode(RemoteEnvelope.self, from: Data(trimmed))
+        do {
+            return try decoder.decode(RemoteEnvelope.self, from: Data(trimmed))
+        } catch {
+            return try RemoteEnvelope.makeLossy(from: Data(trimmed))
+        }
     }
+}
+
+extension RemoteEnvelope {
+    static func makeLossy(from data: Data) throws -> RemoteEnvelope {
+        let object = try JSONSerialization.jsonObject(with: data)
+        guard let dictionary = object as? [String: Any] else {
+            throw CocoaError(.coderReadCorrupt)
+        }
+        return try makeLossy(from: dictionary)
+    }
+
+    private static func makeLossy(from dictionary: [String: Any]) throws -> RemoteEnvelope {
+        let origin = anyInt(dictionary["origin"])
+        let type = anyString(dictionary["type"]) ?? "unknown"
+
+        let message: RemoteMessage
+        switch type {
+        case RemoteMessageType.protocolVersion.rawValue:
+            message = .protocolVersion(.init(version: anyInt(dictionary["version"]) ?? remoteProtocolVersion))
+        case RemoteMessageType.join.rawValue:
+            message = .join(.init(
+                channel: anyString(dictionary["channel"]) ?? "",
+                connectionType: RemoteRole(rawValue: anyString(dictionary["connection_type"]) ?? "") ?? .master
+            ))
+        case RemoteMessageType.channelJoined.rawValue:
+            let clients = (dictionary["clients"] as? [Any] ?? []).compactMap(anyClientDescriptor)
+            message = .channelJoined(.init(channel: anyString(dictionary["channel"]) ?? "", clients: clients))
+        case RemoteMessageType.clientJoined.rawValue:
+            message = .clientJoined(.init(client: anyClientDescriptor(dictionary["client"]) ?? .init(id: anyInt(dictionary["user_id"]) ?? -1, connectionType: .slave)))
+        case RemoteMessageType.clientLeft.rawValue:
+            let clientID = anyInt(dictionary["client_id"]) ?? anyInt(dictionary["user_id"]) ?? anyInt(dictionary["client"]) ?? -1
+            message = .clientLeft(.init(clientID: clientID))
+        case RemoteMessageType.generateKey.rawValue:
+            message = .generateKey(anyString(dictionary["key"]))
+        case RemoteMessageType.key.rawValue:
+            message = .key(.init(
+                vkCode: UInt16(anyInt(dictionary["vk_code"]) ?? 0),
+                scanCode: anyInt(dictionary["scan_code"]).map(UInt16.init),
+                extended: anyBool(dictionary["extended"]) ?? false,
+                pressed: anyBool(dictionary["pressed"]) ?? false
+            ))
+        case RemoteMessageType.speak.rawValue:
+            let sequence = (dictionary["sequence"] as? [Any] ?? []).compactMap(anySpeechSequenceItem)
+            message = .speak(.init(sequence: sequence, priority: anyString(dictionary["priority"]) ?? "normal"))
+        case RemoteMessageType.cancel.rawValue:
+            message = .cancel
+        case RemoteMessageType.pauseSpeech.rawValue:
+            message = .pauseSpeech(anyBool(dictionary["switch"]) ?? false)
+        case RemoteMessageType.tone.rawValue:
+            message = .tone(
+                hz: anyDouble(dictionary["hz"]) ?? 0,
+                length: anyDouble(dictionary["length"]) ?? 0,
+                left: anyDouble(dictionary["left"]) ?? 0,
+                right: anyDouble(dictionary["right"]) ?? 0
+            )
+        case RemoteMessageType.wave.rawValue:
+            message = .wave(
+                fileName: anyString(dictionary["fileName"]) ?? "",
+                asynchronous: anyBool(dictionary["asynchronous"]) ?? false
+            )
+        case RemoteMessageType.sendSAS.rawValue:
+            message = .sendSAS
+        case RemoteMessageType.index.rawValue:
+            message = .index(anyInt(dictionary["index"]))
+        case RemoteMessageType.display.rawValue:
+            message = .display(cells: (dictionary["cells"] as? [Any] ?? []).compactMap(anyInt))
+        case RemoteMessageType.brailleInput.rawValue:
+            message = .brailleInput(
+                dots: anyInt(dictionary["dots"]),
+                space: anyBool(dictionary["space"]),
+                routingIndex: anyInt(dictionary["routingIndex"])
+            )
+        case RemoteMessageType.setBrailleInfo.rawValue:
+            message = .setBrailleInfo(
+                name: anyString(dictionary["name"]) ?? "",
+                numCells: anyInt(dictionary["numCells"]) ?? 0
+            )
+        case RemoteMessageType.setDisplaySize.rawValue:
+            message = .setDisplaySize(sizes: (dictionary["sizes"] as? [Any] ?? []).compactMap(anyInt))
+        case RemoteMessageType.setClipboardText.rawValue:
+            message = .setClipboardText(.init(text: anyString(dictionary["text"]) ?? ""))
+        case RemoteMessageType.motd.rawValue:
+            message = .motd(.init(
+                motd: anyString(dictionary["motd"]) ?? "",
+                forceDisplay: anyBool(dictionary["force_display"]) ?? false
+            ))
+        case RemoteMessageType.versionMismatch.rawValue:
+            message = .versionMismatch
+        case RemoteMessageType.ping.rawValue:
+            message = .ping(.init())
+        case RemoteMessageType.error.rawValue:
+            message = .error(.init(
+                code: anyString(dictionary["code"]) ?? "error",
+                message: anyString(dictionary["message"]) ?? ""
+            ))
+        case RemoteMessageType.nvdaNotConnected.rawValue:
+            message = .nvdaNotConnected
+        default:
+            message = .unsupported(type)
+        }
+        return .init(origin: origin, message: message)
+    }
+}
+
+private func anyString(_ value: Any?) -> String? {
+    if let value = value as? String { return value }
+    if let value = value as? NSNumber { return value.stringValue }
+    return nil
+}
+
+private func anyInt(_ value: Any?) -> Int? {
+    if let value = value as? Int { return value }
+    if let value = value as? NSNumber { return value.intValue }
+    if let value = value as? String { return Int(value) }
+    return nil
+}
+
+private func anyDouble(_ value: Any?) -> Double? {
+    if let value = value as? Double { return value }
+    if let value = value as? NSNumber { return value.doubleValue }
+    if let value = value as? String { return Double(value) }
+    return nil
+}
+
+private func anyBool(_ value: Any?) -> Bool? {
+    if let value = value as? Bool { return value }
+    if let value = value as? NSNumber { return value.boolValue }
+    if let value = value as? String {
+        switch value.lowercased() {
+        case "true", "1": return true
+        case "false", "0": return false
+        default: return nil
+        }
+    }
+    return nil
+}
+
+private func anyClientDescriptor(_ value: Any?) -> RemoteClientDescriptor? {
+    guard let dictionary = value as? [String: Any] else { return nil }
+    guard let id = anyInt(dictionary["id"]) else { return nil }
+    let role = RemoteRole(rawValue: anyString(dictionary["connection_type"]) ?? "") ?? .slave
+    return .init(id: id, connectionType: role)
+}
+
+private func anySpeechSequenceItem(_ value: Any?) -> SpeechSequenceItem? {
+    if let text = value as? String {
+        return .text(text)
+    }
+    if let array = value as? [Any], let name = anyString(array.first) {
+        return .command(name: name)
+    }
+    return nil
 }
