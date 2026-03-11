@@ -95,6 +95,11 @@ jobs:
             dist/VO_NVDA_Remote.dmg
             dist/VO_NVDA_Remote.zip
 
+      - name: Install Sparkle signing dependency
+        if: ${{ secrets.SPARKLE_PRIVATE_ED_KEY != '' }}
+        shell: bash
+        run: python3 -m pip install --user cryptography
+
       - name: Generate appcast
         shell: bash
         env:
