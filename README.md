@@ -29,6 +29,7 @@ Requirements:
 - macOS 14+
 - Xcode 16+
 - Swift 6
+- XcodeGen 2.45+ for regenerating the Xcode project
 
 Build:
 
@@ -46,6 +47,18 @@ Run the app in development:
 
 ```bash
 swift run VONVDARemote
+```
+
+Generate the Xcode project:
+
+```bash
+./scripts/generate_xcode_project.sh
+```
+
+Build the Xcode app target without signing:
+
+```bash
+./scripts/build_xcode_app.sh
 ```
 
 Probe a relay server:
@@ -123,6 +136,8 @@ Optional scripts are included for signed public builds:
 Required secrets/variables are described in [docs/releases.md](/Users/itsawatbanlawanich/projects/vo-remote-desktop/vo-nvda-remote/docs/releases.md)
 
 Unsigned builds are ad-hoc signed so the bundle is structurally valid, but public downloads still need Developer ID signing and notarization if you want Gatekeeper to open them normally on other Macs.
+
+The repository now also includes an Xcode app project at [VONVDARemote.xcodeproj](/Users/itsawatbanlawanich/projects/vo-remote-desktop/vo-nvda-remote/VONVDARemote.xcodeproj) for archive/distribution flows. On this machine, command-line export is still blocked by Apple account access because `xcodebuild` currently reports no usable team account for automatic signing.
 
 ## Auto-update note
 

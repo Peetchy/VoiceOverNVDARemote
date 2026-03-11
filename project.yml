@@ -1,0 +1,44 @@
+name: VONVDARemote
+options:
+  minimumXcodeGenVersion: 2.45.3
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+packages:
+  LocalPackage:
+    path: .
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.7.3
+targets:
+  VONVDARemoteApp:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/VONVDARemote
+    dependencies:
+      - package: LocalPackage
+        product: MacRemoteCore
+      - package: LocalPackage
+        product: RemoteProtocol
+      - package: Sparkle
+        product: Sparkle
+    settings:
+      base:
+        PRODUCT_NAME: "VO NVDA Remote"
+        PRODUCT_BUNDLE_IDENTIFIER: com.vo-nvda-remote.app
+        INFOPLIST_FILE: XcodeSupport/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: Apple Development
+        DEVELOPMENT_TEAM: 9P4236SF25
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 0.1.6
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        SWIFT_VERSION: 6.0
+        ENABLE_HARDENED_RUNTIME: YES
+        LD_RUNPATH_SEARCH_PATHS:
+          - $(inherited)
+          - "@executable_path/../Frameworks"
+    scheme:
+      gatherCoverageData: false
+      testTargets: []

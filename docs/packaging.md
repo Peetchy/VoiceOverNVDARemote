@@ -18,6 +18,24 @@ Build a DMG:
 ./scripts/build_dmg.sh
 ```
 
+Generate the Xcode project:
+
+```bash
+./scripts/generate_xcode_project.sh
+```
+
+Build the Xcode app target without signing:
+
+```bash
+./scripts/build_xcode_app.sh
+```
+
+Archive the Xcode app target:
+
+```bash
+./scripts/archive_xcode_app.sh
+```
+
 Output:
 
 ```text
@@ -43,6 +61,7 @@ Notes:
 - `App Only` capture works without Accessibility permission but only while the app window is active.
 - `build_app.sh` applies an ad-hoc signature so the bundle is structurally valid for local use.
 - For public distribution on other Macs, use Developer ID signing and notarization or Gatekeeper may still block the app.
+- `archive_xcode_app.sh` can switch to Apple portal access with `ALLOW_PROVISIONING_UPDATES=1`, but on this machine `xcodebuild` still reports no usable account for team `9P4236SF25`.
 
 ## Sign
 

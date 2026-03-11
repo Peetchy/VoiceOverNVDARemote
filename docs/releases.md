@@ -44,6 +44,23 @@ Add this repository variable for in-app Sparkle verification:
 If those secrets are absent, the workflow still publishes unsigned public release assets and an appcast.
 Those unsigned assets are useful for internal testing, but macOS Gatekeeper on a different machine may still block them until you add Developer ID signing and notarization secrets.
 
+## Xcode project
+
+The repository now includes an Xcode app project generated from [project.yml](/Users/itsawatbanlawanich/projects/vo-remote-desktop/vo-nvda-remote/project.yml). Use:
+
+```bash
+./scripts/generate_xcode_project.sh
+./scripts/archive_xcode_app.sh
+```
+
+If you want `xcodebuild` to ask Apple for signing assets, run:
+
+```bash
+ALLOW_PROVISIONING_UPDATES=1 ./scripts/archive_xcode_app.sh
+```
+
+On this machine, command-line automatic signing is still blocked because `xcodebuild` reports `No Account for Team "9P4236SF25"` even though the source project and unsigned archive path now work.
+
 ## Appcast URL
 
 The workflow publishes:

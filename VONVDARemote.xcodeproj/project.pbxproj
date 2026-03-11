@@ -1,0 +1,384 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2772C98A5A565D6B085FE1AA /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = D85639D66CC02DFAC8696E23 /* App.swift */; };
+		62F68B55E310DCDA59D0F711 /* SparkleSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A251E4F98FD1C8441515243 /* SparkleSupport.swift */; };
+		72531DDAB69814773BF711EE /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = EB51962EBC7C5655DC5CF17B /* Sparkle */; };
+		8A222F31C98503152890D2AF /* RemoteProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = 80DAA6123792D23719AD11A7 /* RemoteProtocol */; };
+		B794E10EBE05C77C77FC72D4 /* MacRemoteCore in Frameworks */ = {isa = PBXBuildFile; productRef = 657C754282CE46B615B038B3 /* MacRemoteCore */; };
+		F6C4AC6D06C9850B61C01091 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17762D2D0DF1F3F6B721799E /* ContentView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0F1CA3113262D8A5851716DE /* VONVDARemoteApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VONVDARemoteApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		17762D2D0DF1F3F6B721799E /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		3A251E4F98FD1C8441515243 /* SparkleSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleSupport.swift; sourceTree = "<group>"; };
+		D85639D66CC02DFAC8696E23 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		E1F23850E6ED42C8CC42CC70 /* vo-nvda-remote */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "vo-nvda-remote"; path = .; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		39682C8A390852E67F564E96 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B794E10EBE05C77C77FC72D4 /* MacRemoteCore in Frameworks */,
+				8A222F31C98503152890D2AF /* RemoteProtocol in Frameworks */,
+				72531DDAB69814773BF711EE /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2FFF2D92D3B968DEFB366A6F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				0F1CA3113262D8A5851716DE /* VONVDARemoteApp.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5AE9B125965C2906940625B8 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				E1F23850E6ED42C8CC42CC70 /* vo-nvda-remote */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		7D36BAC86CB42131435B28C2 = {
+			isa = PBXGroup;
+			children = (
+				5AE9B125965C2906940625B8 /* Packages */,
+				ACBE6702EC3D27913298EC64 /* Sources */,
+				2FFF2D92D3B968DEFB366A6F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		ACBE6702EC3D27913298EC64 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				E7394D42208A75EE58AC1E7C /* VONVDARemote */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		E7394D42208A75EE58AC1E7C /* VONVDARemote */ = {
+			isa = PBXGroup;
+			children = (
+				D85639D66CC02DFAC8696E23 /* App.swift */,
+				17762D2D0DF1F3F6B721799E /* ContentView.swift */,
+				3A251E4F98FD1C8441515243 /* SparkleSupport.swift */,
+			);
+			path = VONVDARemote;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2E27304671907D64DD15F48A /* VONVDARemoteApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D43DB991EF36BB3F8BFF2E67 /* Build configuration list for PBXNativeTarget "VONVDARemoteApp" */;
+			buildPhases = (
+				346945FDBF012CFC3709D83C /* Sources */,
+				39682C8A390852E67F564E96 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VONVDARemoteApp;
+			packageProductDependencies = (
+				657C754282CE46B615B038B3 /* MacRemoteCore */,
+				80DAA6123792D23719AD11A7 /* RemoteProtocol */,
+				EB51962EBC7C5655DC5CF17B /* Sparkle */,
+			);
+			productName = VONVDARemoteApp;
+			productReference = 0F1CA3113262D8A5851716DE /* VONVDARemoteApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		936B3395491968E5D6A26F56 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2E27304671907D64DD15F48A = {
+						DevelopmentTeam = 9P4236SF25;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = ACE18A4AFD432DF2E4B56C51 /* Build configuration list for PBXProject "VONVDARemote" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 7D36BAC86CB42131435B28C2;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				FC496F2CE8EEBA9B41ED0143 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				77143BC0151C216F0BAA7209 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 2FFF2D92D3B968DEFB366A6F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2E27304671907D64DD15F48A /* VONVDARemoteApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		346945FDBF012CFC3709D83C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2772C98A5A565D6B085FE1AA /* App.swift in Sources */,
+				F6C4AC6D06C9850B61C01091 /* ContentView.swift in Sources */,
+				62F68B55E310DCDA59D0F711 /* SparkleSupport.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		5DC2F475E7F383053B9F6E92 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9P4236SF25;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = XcodeSupport/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.6;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.vo-nvda-remote.app";
+				PRODUCT_NAME = "VO NVDA Remote";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A952458BD78524E4F7AA39A4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		ADECB03236EC89BA8A229105 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E1A9C9EF8AB5BC2145AF2013 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9P4236SF25;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = XcodeSupport/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.6;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.vo-nvda-remote.app";
+				PRODUCT_NAME = "VO NVDA Remote";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		ACE18A4AFD432DF2E4B56C51 /* Build configuration list for PBXProject "VONVDARemote" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ADECB03236EC89BA8A229105 /* Debug */,
+				A952458BD78524E4F7AA39A4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D43DB991EF36BB3F8BFF2E67 /* Build configuration list for PBXNativeTarget "VONVDARemoteApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5DC2F475E7F383053B9F6E92 /* Debug */,
+				E1A9C9EF8AB5BC2145AF2013 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		77143BC0151C216F0BAA7209 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		FC496F2CE8EEBA9B41ED0143 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.7.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		657C754282CE46B615B038B3 /* MacRemoteCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MacRemoteCore;
+		};
+		80DAA6123792D23719AD11A7 /* RemoteProtocol */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RemoteProtocol;
+		};
+		EB51962EBC7C5655DC5CF17B /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FC496F2CE8EEBA9B41ED0143 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 936B3395491968E5D6A26F56 /* Project object */;
+}
