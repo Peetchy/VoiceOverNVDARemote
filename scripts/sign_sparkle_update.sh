@@ -17,4 +17,4 @@ trap cleanup EXIT
 PRIVATE_KEY_PATH="$TMP_DIR/private.pem"
 printf '%s\n' "$SPARKLE_PRIVATE_ED_KEY" > "$PRIVATE_KEY_PATH"
 
-openssl pkeyutl -sign -rawin -inkey "$PRIVATE_KEY_PATH" -in "$UPDATE_FILE" | base64 | tr -d '\n'
+openssl pkeyutl -sign -inkey "$PRIVATE_KEY_PATH" -in "$UPDATE_FILE" | base64 | tr -d '\n'
