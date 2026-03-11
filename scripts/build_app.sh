@@ -28,6 +28,9 @@ if [[ -d "$BUILD_DIR/Sparkle.framework" ]]; then
   cp -R "$BUILD_DIR/Sparkle.framework" "$FRAMEWORKS_DIR/"
 fi
 
+# SwiftPM's executable does not carry the app-style framework runpath by default.
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$MACOS_DIR/$EXECUTABLE_NAME" 2>/dev/null || true
+
 cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
