@@ -42,97 +42,18 @@ public struct ToggleHotKey: Codable, Equatable, Hashable, Sendable {
         self.displayName = displayName
     }
 
-    public static let controlOptionCommandR = ToggleHotKey(
-        keyCode: UInt32(kVK_ANSI_R),
-        modifiers: UInt32(controlKey | optionKey | cmdKey),
-        displayName: "Control+Option+Command+R"
-    )
-
-    public static let controlOptionCommandT = ToggleHotKey(
-        keyCode: UInt32(kVK_ANSI_T),
-        modifiers: UInt32(controlKey | optionKey | cmdKey),
-        displayName: "Control+Option+Command+T"
-    )
-
-    public static let controlOptionCommandBacktick = ToggleHotKey(
+    public static let fixedControlCommandBacktick = ToggleHotKey(
         keyCode: UInt32(kVK_ANSI_Grave),
-        modifiers: UInt32(controlKey | optionKey | cmdKey),
-        displayName: "Control+Option+Command+`"
+        modifiers: UInt32(controlKey | cmdKey),
+        displayName: "Control+Command+`"
     )
-
-    public static let presets: [ToggleHotKey] = [
-        .controlOptionCommandR,
-        .controlOptionCommandT,
-        .controlOptionCommandBacktick,
-    ]
-
-    @MainActor
-    public static func make(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> ToggleHotKey? {
-        let filtered = modifiers.intersection([.control, .option, .command, .shift])
-        guard !filtered.isEmpty else { return nil }
-        guard let keyLabel = HotKeyLabelMapper.label(for: keyCode) else { return nil }
-        let modifierLabel = HotKeyLabelMapper.modifierLabel(for: filtered)
-        let carbonModifiers = HotKeyLabelMapper.carbonModifiers(for: filtered)
-        return ToggleHotKey(
-            keyCode: UInt32(keyCode),
-            modifiers: carbonModifiers,
-            displayName: "\(modifierLabel)+\(keyLabel)"
-        )
-    }
-}
-
-enum HotKeyLabelMapper {
-    private static let keyLabels: [UInt16: String] = [
-        UInt16(kVK_ANSI_A): "A", UInt16(kVK_ANSI_B): "B", UInt16(kVK_ANSI_C): "C", UInt16(kVK_ANSI_D): "D",
-        UInt16(kVK_ANSI_E): "E", UInt16(kVK_ANSI_F): "F", UInt16(kVK_ANSI_G): "G", UInt16(kVK_ANSI_H): "H",
-        UInt16(kVK_ANSI_I): "I", UInt16(kVK_ANSI_J): "J", UInt16(kVK_ANSI_K): "K", UInt16(kVK_ANSI_L): "L",
-        UInt16(kVK_ANSI_M): "M", UInt16(kVK_ANSI_N): "N", UInt16(kVK_ANSI_O): "O", UInt16(kVK_ANSI_P): "P",
-        UInt16(kVK_ANSI_Q): "Q", UInt16(kVK_ANSI_R): "R", UInt16(kVK_ANSI_S): "S", UInt16(kVK_ANSI_T): "T",
-        UInt16(kVK_ANSI_U): "U", UInt16(kVK_ANSI_V): "V", UInt16(kVK_ANSI_W): "W", UInt16(kVK_ANSI_X): "X",
-        UInt16(kVK_ANSI_Y): "Y", UInt16(kVK_ANSI_Z): "Z",
-        UInt16(kVK_ANSI_0): "0", UInt16(kVK_ANSI_1): "1", UInt16(kVK_ANSI_2): "2", UInt16(kVK_ANSI_3): "3",
-        UInt16(kVK_ANSI_4): "4", UInt16(kVK_ANSI_5): "5", UInt16(kVK_ANSI_6): "6", UInt16(kVK_ANSI_7): "7",
-        UInt16(kVK_ANSI_8): "8", UInt16(kVK_ANSI_9): "9",
-        UInt16(kVK_Space): "Space", UInt16(kVK_Tab): "Tab", UInt16(kVK_Return): "Return", UInt16(kVK_Escape): "Escape",
-        UInt16(kVK_F1): "F1", UInt16(kVK_F2): "F2", UInt16(kVK_F3): "F3", UInt16(kVK_F4): "F4",
-        UInt16(kVK_F5): "F5", UInt16(kVK_F6): "F6", UInt16(kVK_F7): "F7", UInt16(kVK_F8): "F8",
-        UInt16(kVK_F9): "F9", UInt16(kVK_F10): "F10", UInt16(kVK_F11): "F11", UInt16(kVK_F12): "F12",
-        UInt16(kVK_ANSI_Grave): "`", UInt16(kVK_Delete): "Delete", UInt16(kVK_ForwardDelete): "ForwardDelete",
-    ]
-
-    static func label(for keyCode: UInt16) -> String? {
-        keyLabels[keyCode]
-    }
-
-    static func modifierLabel(for modifiers: NSEvent.ModifierFlags) -> String {
-        var labels: [String] = []
-        if modifiers.contains(.control) { labels.append("Control") }
-        if modifiers.contains(.option) { labels.append("Option") }
-        if modifiers.contains(.shift) { labels.append("Shift") }
-        if modifiers.contains(.command) { labels.append("Command") }
-        return labels.joined(separator: "+")
-    }
-
-    static func carbonModifiers(for modifiers: NSEvent.ModifierFlags) -> UInt32 {
-        var value: UInt32 = 0
-        if modifiers.contains(.control) { value |= UInt32(controlKey) }
-        if modifiers.contains(.option) { value |= UInt32(optionKey) }
-        if modifiers.contains(.shift) { value |= UInt32(shiftKey) }
-        if modifiers.contains(.command) { value |= UInt32(cmdKey) }
-        return value
-    }
 }
 
 public struct RemoteAppSettings: Codable, Equatable, Sendable {
     public var keyCaptureScope: KeyCaptureScope
-    public var toggleHotKey: ToggleHotKey
 
-    public init(
-        keyCaptureScope: KeyCaptureScope = .session,
-        toggleHotKey: ToggleHotKey = .controlOptionCommandR
-    ) {
+    public init(keyCaptureScope: KeyCaptureScope = .session) {
         self.keyCaptureScope = keyCaptureScope
-        self.toggleHotKey = toggleHotKey
     }
 }
 
@@ -165,7 +86,7 @@ public struct RemoteSessionSnapshot: Equatable, Sendable {
         accessibilityTrusted: Bool = false,
         keyCaptureActive: Bool = false,
         keyCaptureScope: KeyCaptureScope = .session,
-        globalHotKeyDisplay: String = "Control+Option+Command+R",
+        globalHotKeyDisplay: String = "Control+Command+`",
         eventLog: [RemoteEventRecord] = []
     ) {
         self.phase = phase
@@ -207,13 +128,20 @@ public struct CapturedKeyEvent: Equatable, Sendable {
     public let scanCode: UInt16?
     public let extended: Bool
     public let pressed: Bool
+    public let isToggleHotKey: Bool
 
-    public init(vkCode: UInt16, scanCode: UInt16? = nil, extended: Bool = false, pressed: Bool) {
+    public init(vkCode: UInt16, scanCode: UInt16? = nil, extended: Bool = false, pressed: Bool, isToggleHotKey: Bool = false) {
         self.vkCode = vkCode
         self.scanCode = scanCode
         self.extended = extended
         self.pressed = pressed
+        self.isToggleHotKey = isToggleHotKey
     }
+}
+
+private struct ActiveRemoteKey: Hashable, Sendable {
+    let vkCode: UInt16
+    let extended: Bool
 }
 
 @MainActor
@@ -369,43 +297,58 @@ public final class EventTapKeyCapture: KeyCaptureManaging {
 
     private func makeCapturedEvent(from event: CGEvent, type: CGEventType) -> CapturedKeyEvent? {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+        let isToggleHotKey = matchesToggleHotKey(keyCode: UInt16(keyCode), modifiers: event.flags)
         guard let mappedKey = MacVirtualKeyMapper.windowsVirtualKey(for: CGKeyCode(keyCode)) else {
             return nil
         }
         switch type {
         case .keyDown:
-            return .init(vkCode: mappedKey, scanCode: UInt16(keyCode), extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: true)
+            return .init(vkCode: mappedKey, scanCode: MacVirtualKeyMapper.windowsScanCode(for: mappedKey), extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: true, isToggleHotKey: isToggleHotKey)
         case .keyUp:
-            return .init(vkCode: mappedKey, scanCode: UInt16(keyCode), extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: false)
+            return .init(vkCode: mappedKey, scanCode: MacVirtualKeyMapper.windowsScanCode(for: mappedKey), extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: false, isToggleHotKey: isToggleHotKey)
         case .flagsChanged:
             let isPressed = event.flags.contains(MacVirtualKeyMapper.modifierFlag(for: CGKeyCode(keyCode)))
             let previous = modifierState[CGKeyCode(keyCode)] ?? false
             modifierState[CGKeyCode(keyCode)] = isPressed
             guard previous != isPressed else { return nil }
-            return .init(vkCode: mappedKey, scanCode: UInt16(keyCode), extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: isPressed)
+            return .init(vkCode: mappedKey, scanCode: MacVirtualKeyMapper.windowsScanCode(for: mappedKey), extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: isPressed, isToggleHotKey: isToggleHotKey)
         default:
             return nil
         }
     }
 
     private func makeCapturedEvent(from event: NSEvent) -> CapturedKeyEvent? {
+        let isToggleHotKey = matchesToggleHotKey(keyCode: event.keyCode, modifiers: event.modifierFlags)
         guard let mappedKey = MacVirtualKeyMapper.windowsVirtualKey(for: CGKeyCode(event.keyCode)) else {
             return nil
         }
         switch event.type {
         case .keyDown:
-            return .init(vkCode: mappedKey, scanCode: event.keyCode, extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: true)
+            return .init(vkCode: mappedKey, scanCode: MacVirtualKeyMapper.windowsScanCode(for: mappedKey), extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: true, isToggleHotKey: isToggleHotKey)
         case .keyUp:
-            return .init(vkCode: mappedKey, scanCode: event.keyCode, extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: false)
+            return .init(vkCode: mappedKey, scanCode: MacVirtualKeyMapper.windowsScanCode(for: mappedKey), extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: false, isToggleHotKey: isToggleHotKey)
         case .flagsChanged:
             let isPressed = event.modifierFlags.contains(MacVirtualKeyMapper.localModifierFlag(for: event.keyCode))
             let previous = localModifierState[event.keyCode] ?? false
             localModifierState[event.keyCode] = isPressed
             guard previous != isPressed else { return nil }
-            return .init(vkCode: mappedKey, scanCode: event.keyCode, extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: isPressed)
+            return .init(vkCode: mappedKey, scanCode: MacVirtualKeyMapper.windowsScanCode(for: mappedKey), extended: MacVirtualKeyMapper.isExtended(vkCode: mappedKey), pressed: isPressed, isToggleHotKey: isToggleHotKey)
         default:
             return nil
         }
+    }
+
+    private func matchesToggleHotKey(keyCode: UInt16, modifiers: CGEventFlags) -> Bool {
+        keyCode == UInt16(kVK_ANSI_Grave)
+            && modifiers.contains(.maskControl)
+            && modifiers.contains(.maskCommand)
+            && !modifiers.contains(.maskAlternate)
+            && !modifiers.contains(.maskShift)
+    }
+
+    private func matchesToggleHotKey(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
+        let filtered = modifiers.intersection([.control, .command, .option, .shift])
+        return keyCode == UInt16(kVK_ANSI_Grave) && filtered == [.control, .command]
     }
 }
 
@@ -429,7 +372,7 @@ public final class AccessibilityPermissionManager: AccessibilityPermissionChecki
 @MainActor
 public final class CarbonGlobalHotKeyManager: GlobalHotKeyManaging {
     public var onToggleRequested: (() -> Void)?
-    public private(set) var displayName = ToggleHotKey.controlOptionCommandR.displayName
+    public private(set) var displayName = ToggleHotKey.fixedControlCommandBacktick.displayName
 
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
@@ -509,20 +452,43 @@ enum MacVirtualKeyMapper {
         31: 0x4F, 32: 0x55, 33: 0xDB, 34: 0x49, 35: 0x50, 36: 0x0D, 37: 0x4C,
         38: 0x4A, 39: 0xDE, 40: 0x4B, 41: 0xBA, 42: 0xDC, 43: 0xBC,
         44: 0xBF, 45: 0x4E, 46: 0x4D, 47: 0xBE, 48: 0x09, 49: 0x20, 50: 0xC0,
-        51: 0x08, 53: 0x1B, 54: 0x5C, 55: 0x5B, 56: 0xA0, 57: 0x14, 58: 0xA4,
-        59: 0xA2, 60: 0xA1, 61: 0xA5, 62: 0xA3, 65: 0x6E,
+        51: 0x08, 53: 0x1B, 54: 0xA5, 55: 0xA4, 56: 0xA0, 57: 0x14, 58: 0x5B,
+        59: 0xA2, 60: 0xA1, 61: 0x5C, 62: 0xA3, 65: 0x6E,
         67: 0x6A, 69: 0x6B, 71: 0x90, 75: 0x6F, 76: 0x0D, 78: 0x6D,
         79: 0x7C, 80: 0x7D, 81: 0x6C, 82: 0x60, 83: 0x61, 84: 0x62, 85: 0x63, 86: 0x64,
         87: 0x65, 88: 0x66, 89: 0x67, 91: 0x68, 92: 0x69, 96: 0x74,
-        97: 0x79, 98: 0x7C, 99: 0x78, 100: 0x7B, 101: 0x7D, 103: 0x7A,
-        105: 0x7B, 106: 0x7D, 107: 0x7C, 109: 0x70, 111: 0x71, 113: 0x72,
-        114: 0x73, 115: 0x24, 116: 0x21, 117: 0x2E, 118: 0x70, 119: 0x23,
-        120: 0x72, 121: 0x22, 122: 0x71, 123: 0x25, 124: 0x27, 125: 0x28,
+        97: 0x75, 98: 0x76, 99: 0x72, 100: 0x77, 101: 0x78, 103: 0x7A,
+        109: 0x79, 111: 0x7B, 115: 0x24, 116: 0x21, 117: 0x2E, 118: 0x73, 119: 0x23,
+        120: 0x71, 121: 0x22, 122: 0x70, 123: 0x25, 124: 0x27, 125: 0x28,
         126: 0x26
+    ]
+
+    private static let windowsScanCodes: [UInt16: UInt16] = [
+        0x08: 0x0E, 0x09: 0x0F, 0x0D: 0x1C, 0x14: 0x3A, 0x1B: 0x01, 0x20: 0x39,
+        0x21: 0x49, 0x22: 0x51, 0x23: 0x4F, 0x24: 0x47, 0x25: 0x4B, 0x26: 0x48,
+        0x27: 0x4D, 0x28: 0x50, 0x2E: 0x53, 0x30: 0x0B, 0x31: 0x02, 0x32: 0x03,
+        0x33: 0x04, 0x34: 0x05, 0x35: 0x06, 0x36: 0x07, 0x37: 0x08, 0x38: 0x09,
+        0x39: 0x0A, 0x41: 0x1E, 0x42: 0x30, 0x43: 0x2E, 0x44: 0x20, 0x45: 0x12,
+        0x46: 0x21, 0x47: 0x22, 0x48: 0x23, 0x49: 0x17, 0x4A: 0x24, 0x4B: 0x25,
+        0x4C: 0x26, 0x4D: 0x32, 0x4E: 0x31, 0x4F: 0x18, 0x50: 0x19, 0x51: 0x10,
+        0x52: 0x13, 0x53: 0x1F, 0x54: 0x14, 0x55: 0x16, 0x56: 0x2F, 0x57: 0x11,
+        0x58: 0x2D, 0x59: 0x15, 0x5A: 0x2C, 0x5B: 0x5B, 0x5C: 0x5C,
+        0x60: 0x52, 0x61: 0x4F, 0x62: 0x50, 0x63: 0x51, 0x64: 0x4B, 0x65: 0x4C,
+        0x66: 0x4D, 0x67: 0x47, 0x68: 0x48, 0x69: 0x49, 0x6A: 0x37, 0x6B: 0x4E,
+        0x6C: 0x1C, 0x6D: 0x4A, 0x6E: 0x53, 0x6F: 0x35,
+        0x70: 0x3B, 0x71: 0x3C, 0x72: 0x3D, 0x73: 0x3E, 0x74: 0x3F, 0x75: 0x40, 0x76: 0x41, 0x77: 0x42,
+        0x78: 0x43, 0x79: 0x44, 0x7A: 0x57, 0x7B: 0x58, 0x7C: 0x46, 0x7D: 0x53,
+        0x90: 0x45, 0xA0: 0x2A, 0xA1: 0x36, 0xA2: 0x1D, 0xA3: 0x1D, 0xA4: 0x38, 0xA5: 0x38,
+        0xBA: 0x27, 0xBB: 0x0D, 0xBC: 0x33, 0xBD: 0x0C, 0xBE: 0x34, 0xBF: 0x35,
+        0xC0: 0x29, 0xDB: 0x1A, 0xDC: 0x2B, 0xDD: 0x1B, 0xDE: 0x28
     ]
 
     static func windowsVirtualKey(for keyCode: CGKeyCode) -> UInt16? {
         mapping[keyCode]
+    }
+
+    static func windowsScanCode(for vkCode: UInt16) -> UInt16? {
+        windowsScanCodes[vkCode]
     }
 
     static func modifierFlag(for keyCode: CGKeyCode) -> CGEventFlags {
@@ -679,6 +645,10 @@ public final class RemoteSessionController: ObservableObject {
     private let settingsStore: RemoteSettingsStoring
     private var settings: RemoteAppSettings
     private let stopControlKey: UInt16 = 0x7B
+    private var activeRemoteKeys: Set<ActiveRemoteKey> = []
+    private var pendingModifierEvents: [CapturedKeyEvent] = []
+    private var queuedCapturedEvents: [CapturedKeyEvent] = []
+    private var isProcessingCapturedEvents = false
 
     public init(
         transport: RemoteTransporting,
@@ -699,21 +669,19 @@ public final class RemoteSessionController: ObservableObject {
         self.settings = settingsStore.load()
         self.snapshot.accessibilityTrusted = permissionChecker.isTrusted(prompt: false)
         self.snapshot.keyCaptureScope = self.settings.keyCaptureScope
-        self.snapshot.globalHotKeyDisplay = self.settings.toggleHotKey.displayName
+        self.snapshot.globalHotKeyDisplay = ToggleHotKey.fixedControlCommandBacktick.displayName
         transport.onEvent = { [weak self] event in
             Task { @MainActor in
                 self?.handle(event: event)
             }
         }
         keyCapture.onKeyEvent = { [weak self] event in
-            Task { @MainActor in
-                await self?.handleCapturedKeyEvent(event)
-            }
+            self?.enqueueCapturedKeyEvent(event)
         }
         globalHotKeyManager.onToggleRequested = { [weak self] in
             self?.toggleControl()
         }
-        globalHotKeyManager.register(hotKey: settings.toggleHotKey)
+        globalHotKeyManager.register(hotKey: .fixedControlCommandBacktick)
     }
 
     public func refreshAccessibilityPermission(prompt: Bool = false) {
@@ -733,14 +701,6 @@ public final class RemoteSessionController: ObservableObject {
         appendEvent("Key capture scope set to \(scope.rawValue)")
     }
 
-    public func setGlobalHotKey(_ hotKey: ToggleHotKey) {
-        settings.toggleHotKey = hotKey
-        settingsStore.save(settings)
-        globalHotKeyManager.register(hotKey: hotKey)
-        snapshot.globalHotKeyDisplay = hotKey.displayName
-        appendEvent("Global toggle hotkey set to \(hotKey.displayName)")
-    }
-
     public func connect(host: String, port: UInt16 = 6837, key: String) async {
         await connect(using: .init(host: host, port: port, key: key))
     }
@@ -758,8 +718,10 @@ public final class RemoteSessionController: ObservableObject {
     }
 
     public func disconnect() async {
-        keyCapture.stop()
-        snapshot.keyCaptureActive = false
+        stopControllingLocally(reason: nil)
+        pendingModifierEvents.removeAll(keepingCapacity: false)
+        queuedCapturedEvents.removeAll(keepingCapacity: false)
+        await releaseActiveRemoteKeys()
         await transport.disconnect()
         activeConfiguration = nil
         snapshot.phase = .idle
@@ -777,6 +739,8 @@ public final class RemoteSessionController: ObservableObject {
                     appendEvent("Accessibility permission is required before controlling whole session")
                     return
                 }
+            } else {
+                prepareApplicationCaptureEnvironment()
             }
             snapshot.phase = .controlling
             snapshot.keyCaptureActive = keyCapture.start(scope: snapshot.keyCaptureScope)
@@ -787,10 +751,11 @@ public final class RemoteSessionController: ObservableObject {
             }
             appendEvent("Controlling remote machine")
         case .controlling:
-            snapshot.phase = .connected
-            keyCapture.stop()
-            snapshot.keyCaptureActive = false
-            appendEvent("Controlling local machine")
+            stopControllingLocally(reason: "Controlling local machine")
+            pendingModifierEvents.removeAll(keepingCapacity: false)
+            Task {
+                await releaseActiveRemoteKeys()
+            }
         case .idle, .connecting, .failed:
             appendEvent("Connect before enabling control")
         }
@@ -814,8 +779,19 @@ public final class RemoteSessionController: ObservableObject {
             appendEvent("Ignoring key send while not controlling")
             return
         }
+        await sendRemoteKey(vkCode: vkCode, scanCode: scanCode, extended: extended, pressed: pressed)
+    }
+
+    public func sendRemoteKey(vkCode: UInt16, scanCode: UInt16? = nil, extended: Bool = false, pressed: Bool = true) async {
+        guard snapshot.phase == .connected || snapshot.phase == .controlling else {
+            appendEvent("Ignoring remote key send while disconnected")
+            return
+        }
         do {
             try await transport.send(.init(message: .key(.init(vkCode: vkCode, scanCode: scanCode, extended: extended, pressed: pressed))))
+            if snapshot.phase == .controlling {
+                trackRemoteKeyState(vkCode: vkCode, extended: extended, pressed: pressed)
+            }
             appendEvent("Sent key \(vkCode)")
         } catch {
             appendEvent("Key send failed: \(error.localizedDescription)")
@@ -930,16 +906,131 @@ public final class RemoteSessionController: ObservableObject {
         }
     }
 
+    private func enqueueCapturedKeyEvent(_ event: CapturedKeyEvent) {
+        queuedCapturedEvents.append(event)
+        guard !isProcessingCapturedEvents else { return }
+        isProcessingCapturedEvents = true
+        Task { @MainActor in
+            await processCapturedEventQueue()
+        }
+    }
+
+    private func processCapturedEventQueue() async {
+        while !queuedCapturedEvents.isEmpty {
+            let event = queuedCapturedEvents.removeFirst()
+            await handleCapturedKeyEvent(event)
+        }
+        isProcessingCapturedEvents = false
+    }
+
     private func handleCapturedKeyEvent(_ event: CapturedKeyEvent) async {
         guard case .controlling = snapshot.phase else { return }
-        if event.vkCode == stopControlKey, event.pressed {
-            keyCapture.stop()
-            snapshot.keyCaptureActive = false
-            snapshot.phase = .connected
-            appendEvent("Controlling local machine")
+        if event.isToggleHotKey, event.pressed {
+            stopControllingLocally(reason: "Controlling local machine")
+            pendingModifierEvents.removeAll(keepingCapacity: false)
+            await releaseActiveRemoteKeys()
             return
         }
-        await sendKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: event.pressed)
+        if event.vkCode == stopControlKey, event.pressed {
+            stopControllingLocally(reason: "Controlling local machine")
+            pendingModifierEvents.removeAll(keepingCapacity: false)
+            await releaseActiveRemoteKeys()
+            return
+        }
+        if isBufferedModifier(event.vkCode) {
+            await handleBufferedModifierEvent(event)
+            return
+        }
+        if event.pressed {
+            await flushPendingModifierEvents()
+        }
+        appendEvent("Captured key \(event.vkCode) \(event.pressed ? "down" : "up")")
+        await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: event.pressed)
+    }
+
+    private func trackRemoteKeyState(vkCode: UInt16, extended: Bool, pressed: Bool) {
+        let key = ActiveRemoteKey(vkCode: vkCode, extended: extended)
+        if pressed {
+            activeRemoteKeys.insert(key)
+        } else {
+            activeRemoteKeys.remove(key)
+        }
+    }
+
+    private func stopControllingLocally(reason: String?) {
+        keyCapture.stop()
+        snapshot.keyCaptureActive = false
+        if case .controlling = snapshot.phase {
+            snapshot.phase = .connected
+        }
+        if let reason {
+            appendEvent(reason)
+        }
+    }
+
+    private func releaseActiveRemoteKeys() async {
+        let keysToRelease = activeRemoteKeys
+        activeRemoteKeys.removeAll(keepingCapacity: true)
+        guard !keysToRelease.isEmpty else { return }
+        for key in keysToRelease {
+            do {
+                try await transport.send(.init(message: .key(.init(vkCode: key.vkCode, scanCode: nil, extended: key.extended, pressed: false))))
+            } catch {
+                appendEvent("Key release failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func handleBufferedModifierEvent(_ event: CapturedKeyEvent) async {
+        let key = ActiveRemoteKey(vkCode: event.vkCode, extended: event.extended)
+        if event.pressed {
+            if !pendingModifierEvents.contains(where: { $0.vkCode == event.vkCode && $0.extended == event.extended }) &&
+                !activeRemoteKeys.contains(key) {
+                pendingModifierEvents.append(event)
+            }
+            return
+        }
+        if let index = pendingModifierEvents.firstIndex(where: { $0.vkCode == event.vkCode && $0.extended == event.extended }) {
+            let pending = pendingModifierEvents.remove(at: index)
+            appendEvent("Captured key \(pending.vkCode) down")
+            await sendRemoteKey(vkCode: pending.vkCode, scanCode: pending.scanCode, extended: pending.extended, pressed: true)
+            appendEvent("Captured key \(event.vkCode) up")
+            await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: false)
+            return
+        }
+        appendEvent("Captured key \(event.vkCode) up")
+        await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: false)
+    }
+
+    private func flushPendingModifierEvents() async {
+        let pending = pendingModifierEvents
+        pendingModifierEvents.removeAll(keepingCapacity: true)
+        for event in pending {
+            appendEvent("Captured key \(event.vkCode) down")
+            await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: true)
+        }
+    }
+
+    private func isBufferedModifier(_ vkCode: UInt16) -> Bool {
+        switch vkCode {
+        case 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func prepareApplicationCaptureEnvironment() {
+        guard let app = NSApp else {
+            appendEvent("App-only capture armed")
+            return
+        }
+        app.activate(ignoringOtherApps: true)
+        if let window = app.keyWindow ?? app.windows.first {
+            window.makeKeyAndOrderFront(nil)
+            window.makeFirstResponder(nil)
+        }
+        appendEvent("App-only capture armed on active VO NVDA Remote window")
     }
 
     private func appendEvent(_ message: String) {

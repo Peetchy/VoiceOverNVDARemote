@@ -36,6 +36,14 @@ Archive the Xcode app target:
 ./scripts/archive_xcode_app.sh
 ```
 
+Archive and export a Developer ID signed app:
+
+```bash
+export DEVELOPMENT_TEAM="9P4236SF25"
+export CODESIGN_IDENTITY="Developer ID Application: Your Name (9P4236SF25)"
+./scripts/export_developer_id_app.sh
+```
+
 Output:
 
 ```text
@@ -62,6 +70,7 @@ Notes:
 - `build_app.sh` applies an ad-hoc signature so the bundle is structurally valid for local use.
 - For public distribution on other Macs, use Developer ID signing and notarization or Gatekeeper may still block the app.
 - `archive_xcode_app.sh` can switch to Apple portal access with `ALLOW_PROVISIONING_UPDATES=1`, but on this machine `xcodebuild` still reports no usable account for team `9P4236SF25`.
+- `export_developer_id_app.sh` is the preferred path once a real `Developer ID Application` certificate is installed on the machine.
 
 ## Sign
 

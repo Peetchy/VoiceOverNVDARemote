@@ -61,10 +61,24 @@ Build the Xcode app target without signing:
 ./scripts/build_xcode_app.sh
 ```
 
+Archive and export a Developer ID signed app:
+
+```bash
+export DEVELOPMENT_TEAM="9P4236SF25"
+export CODESIGN_IDENTITY="Developer ID Application: Your Name (9P4236SF25)"
+./scripts/export_developer_id_app.sh
+```
+
 Probe a relay server:
 
 ```bash
 swift run RelayProbe nvdaremote.com 0871234321 6837
+```
+
+Probe app-only key capture locally:
+
+```bash
+swift run KeyCaptureProbe
 ```
 
 ## Key capture modes
@@ -78,8 +92,13 @@ Default stop-control key:
 
 Global toggle hotkey:
 
-- configurable in the app UI
-- stored in `UserDefaults`
+- fixed to `Control+Command+\``
+
+Modifier mapping while controlling:
+
+- `Command` maps to Windows `Alt`
+- `Option` maps to the Windows key
+- `Control` maps to Windows `Control`
 
 ## Packaging
 

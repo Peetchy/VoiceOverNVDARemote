@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "WindowsCompanionContract", targets: ["WindowsCompanionContract"]),
         .executable(name: "VONVDARemote", targets: ["VONVDARemote"]),
         .executable(name: "RelayProbe", targets: ["RelayProbe"]),
+        .executable(name: "KeyCaptureProbe", targets: ["KeyCaptureProbe"]),
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.7.3"),
@@ -38,6 +39,10 @@ let package = Package(
         .executableTarget(
             name: "RelayProbe",
             dependencies: ["MacRemoteCore"]
+        ),
+        .executableTarget(
+            name: "KeyCaptureProbe",
+            dependencies: ["MacRemoteCore", "RemoteProtocol"]
         ),
         .testTarget(
             name: "RemoteProtocolTests",

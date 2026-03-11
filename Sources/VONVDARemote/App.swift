@@ -11,8 +11,15 @@ struct VONVDARemoteApp: App {
 
     var body: some Scene {
         WindowGroup("VO NVDA Remote") {
-            ContentView(controller: controller, sparkleController: sparkleController)
+            ContentView(controller: controller)
                 .frame(minWidth: 900, minHeight: 620)
+        }
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates...") {
+                    sparkleController.checkForUpdates()
+                }
+            }
         }
     }
 }

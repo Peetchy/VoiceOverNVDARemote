@@ -4,15 +4,12 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var controller: RemoteSessionController
-    @ObservedObject var sparkleController: SparkleController
+    @StateObject private var soundPlayer = SessionSoundPlayer()
 
     @State private var host = "nvdaremote.com"
     @State private var port = "6837"
     @State private var key = "0871234321"
     @State private var captureScope: KeyCaptureScope = .session
-    @State private var toggleHotKey: ToggleHotKey = .controlOptionCommandR
-    @State private var isRecordingHotKey = false
-    @State private var hotKeyMonitor: Any?
 
     var body: some View {
         HStack(spacing: 20) {
@@ -39,19 +36,26 @@ struct ContentView: View {
         )
         .onAppear {
             captureScope = controller.snapshot.keyCaptureScope
-            toggleHotKey = ToggleHotKey.presets.first(where: { $0.displayName == controller.snapshot.globalHotKeyDisplay }) ?? .controlOptionCommandR
         }
-        .onDisappear {
-            stopHotKeyRecording()
+        .onChange(of: controller.snapshot.phase) { oldValue, newValue in
+            soundPlayer.playTransition(from: oldValue, to: newValue)
         }
     }
 
     private var connectionPanel: some View {
         GroupBox("Connection") {
             VStack(alignment: .leading, spacing: 12) {
-                TextField("Host", text: $host)
-                TextField("Port", text: $port)
-                SecureField("Session Key", text: $key)
+                if connectionInputsEnabled {
+                    TextField("Host", text: $host)
+                    TextField("Port", text: $port)
+                    SecureField("Session Key", text: $key)
+                } else {
+                    Text("Connected to \(host):\(port)")
+                        .font(.headline)
+                    Text("Session key is hidden while connected")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text("Mode: control another machine")
                     .foregroundStyle(.secondary)
                 Text("While controlling, local key events are captured. Press F12 to return control to this Mac.")
@@ -68,90 +72,63 @@ struct ContentView: View {
                 .onChange(of: captureScope) { _, newValue in
                     controller.setKeyCaptureScope(newValue)
                 }
-                Picker("Toggle Hotkey", selection: $toggleHotKey) {
-                    ForEach(ToggleHotKey.presets, id: \.displayName) { hotKey in
-                        Text(hotKey.displayName).tag(hotKey)
-                    }
-                }
-                .onChange(of: toggleHotKey) { _, newValue in
-                    controller.setGlobalHotKey(newValue)
-                }
-                HStack {
-                    Button(isRecordingHotKey ? "Press New Hotkey..." : "Record Hotkey") {
-                        if isRecordingHotKey {
-                            stopHotKeyRecording()
-                        } else {
-                            startHotKeyRecording()
+
+                if shouldShowAccessibilityWarning {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Whole Session needs Accessibility access before it can capture keys.", systemImage: "hand.raised.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                        HStack {
+                            Button("Refresh Access") {
+                                controller.refreshAccessibilityPermission()
+                            }
+                            Button("Open Settings") {
+                                controller.openAccessibilitySettings()
+                            }
                         }
-                    }
-                    Text(controller.snapshot.globalHotKeyDisplay)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Circle()
-                        .fill(controller.snapshot.accessibilityTrusted ? Color.green : Color.orange)
-                        .frame(width: 10, height: 10)
-                    Text(permissionLabel)
-                        .font(.caption)
-                    Spacer()
-                    Button("Refresh") {
-                        controller.refreshAccessibilityPermission()
-                    }
-                    Button("Open Settings") {
-                        controller.openAccessibilitySettings()
                     }
                 }
 
-                HStack {
-                    Button("Connect") {
-                        Task {
+                Button(connectionButtonTitle) {
+                    Task {
+                        if isConnectedLike {
+                            await controller.disconnect()
+                        } else {
                             await controller.connect(host: host, port: UInt16(port) ?? 6837, key: key)
                         }
                     }
-                    .keyboardShortcut(.defaultAction)
-
-                    Button("Disconnect") {
-                        Task {
-                            await controller.disconnect()
-                        }
-                    }
                 }
+                .keyboardShortcut(.defaultAction)
+                .tint(isConnectedLike ? .red : .accentColor)
+                .buttonStyle(.borderedProminent)
 
                 HStack {
                     Button(controlButtonTitle) {
                         controller.toggleControl()
                     }
+                    .disabled(!canToggleControl)
                     Button("Send F11") {
                         Task {
-                            await controller.sendKey(vkCode: 122, scanCode: 87, extended: false, pressed: true)
-                            await controller.sendKey(vkCode: 122, scanCode: 87, extended: false, pressed: false)
+                            await controller.sendRemoteKey(vkCode: 0x7A, scanCode: 0x57, extended: false, pressed: true)
+                            await controller.sendRemoteKey(vkCode: 0x7A, scanCode: 0x57, extended: false, pressed: false)
                         }
                     }
+                    .disabled(!canUseConnectedCommands)
                     Button("Push Clipboard") {
                         Task {
                             await controller.pushClipboard()
                         }
                     }
+                    .disabled(!canUseConnectedCommands)
                     Button("Ping") {
                         Task {
                             await controller.sendPing()
                         }
                     }
-                    Button("Check for Updates") {
-                        sparkleController.checkForUpdates()
-                    }
                 }
             }
             .textFieldStyle(.roundedBorder)
         }
-    }
-
-    private var permissionLabel: String {
-        if captureScope == .application {
-            return "App-only capture does not require Accessibility permission"
-        }
-        return controller.snapshot.accessibilityTrusted ? "Accessibility permission granted" : "Accessibility permission required"
     }
 
     private var statusPanel: some View {
@@ -161,6 +138,11 @@ struct ContentView: View {
                     .font(.title3.weight(.semibold))
                 Text("Peers: \(controller.snapshot.peers.count)")
                 Text("Key capture: \(controller.snapshot.keyCaptureActive ? "active" : "inactive")")
+                if controller.snapshot.keyCaptureScope == .application && controller.snapshot.keyCaptureActive {
+                    Text("App-only capture is live. Keep VO NVDA Remote frontmost while sending keys.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text("Latest announcement: \(controller.snapshot.latestAnnouncement ?? "None")")
                     .lineLimit(3)
                 Button("Send Ctrl+Alt+Del") {
@@ -168,6 +150,7 @@ struct ContentView: View {
                         await controller.sendCtrlAltDelete()
                     }
                 }
+                .disabled(!canUseConnectedCommands)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -235,25 +218,44 @@ struct ContentView: View {
         }
     }
 
-    private func startHotKeyRecording() {
-        stopHotKeyRecording()
-        isRecordingHotKey = true
-        hotKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard isRecordingHotKey else { return event }
-            if let hotKey = ToggleHotKey.make(keyCode: event.keyCode, modifiers: event.modifierFlags) {
-                toggleHotKey = hotKey
-                controller.setGlobalHotKey(hotKey)
-            }
-            stopHotKeyRecording()
-            return nil
+    private var isConnectedLike: Bool {
+        switch controller.snapshot.phase {
+        case .connected, .controlling:
+            return true
+        case .idle, .connecting, .failed:
+            return false
         }
     }
 
-    private func stopHotKeyRecording() {
-        isRecordingHotKey = false
-        if let hotKeyMonitor {
-            NSEvent.removeMonitor(hotKeyMonitor)
-            self.hotKeyMonitor = nil
+    private var connectionButtonTitle: String {
+        switch controller.snapshot.phase {
+        case .connecting:
+            return "Connecting..."
+        case .connected, .controlling:
+            return "Disconnect"
+        case .idle, .failed:
+            return "Connect"
         }
+    }
+
+    private var connectionInputsEnabled: Bool {
+        !isConnectedLike && controller.snapshot.phase != .connecting
+    }
+
+    private var canToggleControl: Bool {
+        switch controller.snapshot.phase {
+        case .connected, .controlling:
+            return true
+        case .idle, .connecting, .failed:
+            return false
+        }
+    }
+
+    private var canUseConnectedCommands: Bool {
+        isConnectedLike
+    }
+
+    private var shouldShowAccessibilityWarning: Bool {
+        captureScope == .session && !controller.snapshot.accessibilityTrusted
     }
 }
