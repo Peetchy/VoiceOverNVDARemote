@@ -25,4 +25,22 @@ final class RemoteProtocolTests: XCTestCase {
         XCTAssertTrue(json.contains("\"type\":\"speak\""))
         XCTAssertEqual(try serializer.deserialize(data), envelope)
     }
+
+    func testClientLeftAcceptsUserIDAlias() throws {
+        let serializer = NewlineDelimitedJSONSerializer()
+        let payload = #"{"type":"client_left","user_id":17}"#.data(using: .utf8)!
+
+        let decoded = try serializer.deserialize(payload)
+
+        XCTAssertEqual(decoded, RemoteEnvelope(message: .clientLeft(.init(clientID: 17))))
+    }
+
+    func testErrorAcceptsMissingCode() throws {
+        let serializer = NewlineDelimitedJSONSerializer()
+        let payload = #"{"type":"error","message":"incorrect_password"}"#.data(using: .utf8)!
+
+        let decoded = try serializer.deserialize(payload)
+
+        XCTAssertEqual(decoded, RemoteEnvelope(message: .error(.init(code: "error", message: "incorrect_password"))))
+    }
 }

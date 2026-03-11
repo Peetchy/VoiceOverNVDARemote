@@ -183,6 +183,7 @@ public enum TransportEvent: Sendable {
     case connected
     case disconnected(String?)
     case message(RemoteEnvelope)
+    case decodeFailure(String)
 }
 
 public protocol RemoteTransporting: AnyObject, Sendable {
@@ -657,8 +658,8 @@ public final class NVDAProtocolTransport: NSObject, RemoteTransporting, @uncheck
                 let envelope = try serializer.deserialize(Data(line))
                 onEvent?(.message(envelope))
             } catch {
-                onEvent?(.disconnected("Protocol decode failed: \(error.localizedDescription)"))
-                return
+                let payload = String(decoding: line.prefix(256), as: UTF8.self)
+                onEvent?(.decodeFailure("Protocol decode failed: \(error.localizedDescription). Payload: \(payload)"))
             }
         }
     }
@@ -857,6 +858,8 @@ public final class RemoteSessionController: ObservableObject {
                 snapshot.phase = .idle
                 appendEvent("Transport disconnected")
             }
+        case let .decodeFailure(message):
+            appendEvent(message)
         case let .message(envelope):
             handle(message: envelope)
         }

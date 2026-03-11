@@ -289,6 +289,28 @@ final class MacRemoteCoreTests: XCTestCase {
         XCTAssertEqual(controller.snapshot.globalHotKeyDisplay, ToggleHotKey.controlOptionCommandT.displayName)
     }
 
+    @MainActor
+    func testDecodeFailureDoesNotDisconnectSession() async throws {
+        let transport = MockTransport()
+        let controller = RemoteSessionController(
+            transport: transport,
+            announcer: MockAnnouncer(),
+            clipboard: MockClipboard(),
+            keyCapture: MockKeyCapture(),
+            permissionChecker: MockPermissionChecker(isTrusted: true),
+            globalHotKeyManager: MockGlobalHotKeyManager(),
+            settingsStore: MockSettingsStore()
+        )
+
+        await controller.connect(using: sampleConfiguration(role: .master))
+        await settle()
+        transport.emit(.decodeFailure("Protocol decode failed: missing field"))
+        await settle()
+
+        XCTAssertEqual(controller.snapshot.phase, .connected)
+        XCTAssertTrue(controller.snapshot.eventLog.contains { $0.message.contains("Protocol decode failed") })
+    }
+
     private func sampleConfiguration(role: RemoteRole) -> RemoteConnectionConfiguration {
         RemoteConnectionConfiguration(
             host: "localhost",

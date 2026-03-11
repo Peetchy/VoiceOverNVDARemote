@@ -211,6 +211,25 @@ public struct ErrorPayload: Codable, Equatable, Sendable {
     }
 }
 
+extension ErrorPayload {
+    private enum CodingKeys: String, CodingKey {
+        case code
+        case message
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.code = try container.decodeIfPresent(String.self, forKey: .code) ?? "error"
+        self.message = try container.decode(String.self, forKey: .message)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(code, forKey: .code)
+        try container.encode(message, forKey: .message)
+    }
+}
+
 public struct MotdPayload: Codable, Equatable, Sendable {
     public let motd: String
     public let forceDisplay: Bool
@@ -289,6 +308,8 @@ extension RemoteEnvelope: Codable {
         case origin
         case version
         case channel
+        case userID = "user_id"
+        case userIDs = "user_ids"
         case connectionType = "connection_type"
         case clients
         case client
@@ -336,12 +357,21 @@ extension RemoteEnvelope: Codable {
         case .channelJoined:
             self.message = .channelJoined(.init(
                 channel: try container.decode(String.self, forKey: .channel),
-                clients: try container.decode([RemoteClientDescriptor].self, forKey: .clients)
+                clients: try container.decodeIfPresent([RemoteClientDescriptor].self, forKey: .clients) ?? []
             ))
         case .clientJoined:
             self.message = .clientJoined(.init(client: try container.decode(RemoteClientDescriptor.self, forKey: .client)))
         case .clientLeft:
-            self.message = .clientLeft(.init(clientID: try container.decode(Int.self, forKey: .clientID)))
+            let clientID = try container.decodeIfPresent(Int.self, forKey: .clientID)
+                ?? container.decodeIfPresent(Int.self, forKey: .userID)
+                ?? container.decodeIfPresent(Int.self, forKey: .client)
+            guard let clientID else {
+                throw DecodingError.keyNotFound(
+                    CodingKeys.clientID,
+                    .init(codingPath: decoder.codingPath, debugDescription: "Missing client identifier")
+                )
+            }
+            self.message = .clientLeft(.init(clientID: clientID))
         case .key:
             self.message = .key(.init(
                 vkCode: try container.decode(UInt16.self, forKey: .vkCode),
@@ -399,10 +429,7 @@ extension RemoteEnvelope: Codable {
         case .ping:
             self.message = .ping(.init())
         case .error:
-            self.message = .error(.init(
-                code: try container.decode(String.self, forKey: .code),
-                message: try container.decode(String.self, forKey: .message)
-            ))
+            self.message = .error(try ErrorPayload(from: decoder))
         case .nvdaNotConnected:
             self.message = .nvdaNotConnected
         }
