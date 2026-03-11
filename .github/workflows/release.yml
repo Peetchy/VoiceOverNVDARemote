@@ -97,7 +97,7 @@ jobs:
 
       - name: Install Sparkle signing dependency
         shell: bash
-        run: python3 -m pip install --user cryptography
+        run: python3 -m pip install --user --break-system-packages cryptography
 
       - name: Generate appcast
         shell: bash
