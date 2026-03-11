@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (example: 0.1.0)"
+        required: true
+        default: "0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    env:
+      APP_NAME: VO NVDA Remote
+      BUNDLE_ID: com.vo-nvda-remote.app
+      APPCAST_URL: https://peetchy.github.io/VoiceOverNVDARemote/appcast.xml
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          BUILD_NUMBER="${{ github.run_number }}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Build app bundle
+        shell: bash
+        run: |
+          APP_VERSION="${{ steps.version.outputs.version }}" \
+          APP_BUILD="${{ steps.version.outputs.build }}" \
+          APPCAST_URL="$APPCAST_URL" \
+          ./scripts/build_app.sh
+
+      - name: Sign app when certificate is available
+        if: ${{ secrets.CODESIGN_IDENTITY != '' }}
+        shell: bash
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.CODESIGN_IDENTITY }}
+        run: ./scripts/sign_app.sh
+
+      - name: Notarize app when Apple credentials are available
+        if: ${{ secrets.CODESIGN_IDENTITY != '' && secrets.APPLE_ID != '' && secrets.TEAM_ID != '' && secrets.APP_PASSWORD != '' }}
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        run: ./scripts/notarize_app.sh
+
+      - name: Build DMG
+        shell: bash
+        run: ./scripts/build_dmg.sh
+
+      - name: Create release archive
+        shell: bash
+        run: ditto -c -k --keepParent "dist/${APP_NAME}.app" "dist/VO_NVDA_Remote.zip"
+
+      - name: Publish GitHub release
+        id: publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: VO NVDA Remote ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            dist/VO_NVDA_Remote.dmg
+            dist/VO_NVDA_Remote.zip
+
+      - name: Generate appcast
+        shell: bash
+        env:
+          APPCAST_VERSION: ${{ steps.version.outputs.version }}
+          APPCAST_BUILD: ${{ steps.version.outputs.build }}
+          APPCAST_URL: https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/VO_NVDA_Remote.dmg
+        run: |
+          APPCAST_LENGTH="$(stat -f%z dist/VO_NVDA_Remote.dmg)"
+          export APPCAST_LENGTH
+          ./scripts/generate_appcast.sh
+
+      - name: Publish appcast to GitHub Pages branch
+        shell: bash
+        run: |
+          TMP_DIR="$(mktemp -d)"
+          git worktree add "$TMP_DIR" gh-pages || (
+            git fetch origin gh-pages:gh-pages || true
+            git worktree add -B gh-pages "$TMP_DIR" origin/gh-pages || git worktree add -B gh-pages "$TMP_DIR"
+          )
+          cp dist/appcast.xml "$TMP_DIR/appcast.xml"
+          cd "$TMP_DIR"
+          touch .nojekyll
+          git add appcast.xml .nojekyll
+          if git diff --cached --quiet; then
+            echo "No appcast changes to publish"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Publish appcast for v${{ steps.version.outputs.version }}"
+          git push origin HEAD:gh-pages

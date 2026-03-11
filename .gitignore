@@ -20,3 +20,13 @@ rad.json
 *.flf
 #Test results file
 TestResults.xml
+
+# SwiftPM / macOS app outputs
+.build/
+dist/
+.DS_Store
+
+# Xcode / editor
+DerivedData/
+*.xcworkspace
+*.xcodeproj
