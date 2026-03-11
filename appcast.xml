@@ -9,13 +9,13 @@
     <language>en</language>
     <item>
       <title>Version 0.1.1</title>
-      <pubDate>Wed, 11 Mar 2026 08:34:46 +0000</pubDate>
-      <sparkle:version>3</sparkle:version>
+      <pubDate>Wed, 11 Mar 2026 08:35:08 +0000</pubDate>
+      <sparkle:version>4</sparkle:version>
       <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <enclosure
         url="https://github.com/Peetchy/VoiceOverNVDARemote/releases/download/v0.1.1/VO_NVDA_Remote.dmg"
-        length="474250"
+        length="474247"
         type="application/octet-stream"
         sparkle:edSignature="" />
     </item>
