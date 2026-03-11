@@ -169,3 +169,7 @@ For in-app automatic update verification to work correctly:
 - the appcast must include `sparkle:edSignature`
 
 This repository includes the required scripts and GitHub Actions wiring for that flow.
+
+## License
+
+This repository is licensed under the GNU General Public License v2. See [LICENSE](/Users/itsawatbanlawanich/projects/vo-remote-desktop/vo-nvda-remote/LICENSE).
