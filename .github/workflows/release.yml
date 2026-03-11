@@ -48,20 +48,29 @@ jobs:
           ./scripts/build_app.sh
 
       - name: Sign app when certificate is available
-        if: ${{ secrets.CODESIGN_IDENTITY != '' }}
         shell: bash
         env:
-          CODESIGN_IDENTITY: ${{ secrets.CODESIGN_IDENTITY }}
-        run: ./scripts/sign_app.sh
+          CODESIGN_IDENTITY: ${{ secrets.CODESIGN_IDENTITY || '' }}
+        run: |
+          if [[ -z "$CODESIGN_IDENTITY" ]]; then
+            echo "Skipping signing; CODESIGN_IDENTITY is not configured"
+            exit 0
+          fi
+          ./scripts/sign_app.sh
 
       - name: Notarize app when Apple credentials are available
-        if: ${{ secrets.CODESIGN_IDENTITY != '' && secrets.APPLE_ID != '' && secrets.TEAM_ID != '' && secrets.APP_PASSWORD != '' }}
         shell: bash
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          TEAM_ID: ${{ secrets.TEAM_ID }}
-          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
-        run: ./scripts/notarize_app.sh
+          CODESIGN_IDENTITY: ${{ secrets.CODESIGN_IDENTITY || '' }}
+          APPLE_ID: ${{ secrets.APPLE_ID || '' }}
+          TEAM_ID: ${{ secrets.TEAM_ID || '' }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD || '' }}
+        run: |
+          if [[ -z "$CODESIGN_IDENTITY" || -z "$APPLE_ID" || -z "$TEAM_ID" || -z "$APP_PASSWORD" ]]; then
+            echo "Skipping notarization; Apple signing credentials are not fully configured"
+            exit 0
+          fi
+          ./scripts/notarize_app.sh
 
       - name: Build DMG
         shell: bash
