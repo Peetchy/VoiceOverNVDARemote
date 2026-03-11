@@ -24,6 +24,19 @@ Output:
 dist/VO_NVDA_Remote.dmg
 ```
 
+Generate Sparkle update keys:
+
+```bash
+./scripts/generate_sparkle_keys.sh
+```
+
+Sign an update archive manually:
+
+```bash
+export SPARKLE_PRIVATE_ED_KEY="$(cat keys/sparkle_ed25519_private.pem)"
+./scripts/sign_sparkle_update.sh dist/VO_NVDA_Remote.dmg
+```
+
 Notes:
 
 - First launch may require granting Accessibility access if you use `Whole Session` key capture.
@@ -65,3 +78,4 @@ export APPCAST_SIGNATURE=""
 ```
 
 If you want the bundle to carry a feed URL, set `APPCAST_URL` before `./scripts/build_app.sh`.
+If you want in-app Sparkle update verification to work, set `SPARKLE_PUBLIC_ED_KEY` before `./scripts/build_app.sh`.

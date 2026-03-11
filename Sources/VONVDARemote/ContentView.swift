@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var controller: RemoteSessionController
+    @ObservedObject var sparkleController: SparkleController
 
     @State private var host = "nvdaremote.com"
     @State private var port = "6837"
@@ -136,6 +137,9 @@ struct ContentView: View {
                         Task {
                             await controller.sendPing()
                         }
+                    }
+                    Button("Check for Updates") {
+                        sparkleController.checkForUpdates()
                     }
                 }
             }

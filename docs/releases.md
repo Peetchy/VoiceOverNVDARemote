@@ -35,6 +35,11 @@ If you want signed and notarized public releases, add these repository secrets:
 - `APPLE_ID`
 - `TEAM_ID`
 - `APP_PASSWORD`
+- `SPARKLE_PRIVATE_ED_KEY`
+
+Add this repository variable for in-app Sparkle verification:
+
+- `SPARKLE_PUBLIC_ED_KEY`
 
 If those secrets are absent, the workflow still publishes unsigned public release assets and an appcast.
 

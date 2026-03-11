@@ -124,7 +124,12 @@ Required secrets/variables are described in [docs/releases.md](/Users/itsawatban
 
 ## Auto-update note
 
-The GitHub-hosted update feed and public release assets are live.
+The app now includes Sparkle runtime support.
 
-At this point, the repository is ready for a Sparkle-compatible update pipeline on the distribution side.
-If you want in-app automatic update checking and installation, the next step is embedding Sparkle runtime into the macOS app and signing update archives with a Sparkle EdDSA key.
+For in-app automatic update verification to work correctly:
+
+- the app bundle must be built with `SUPublicEDKey`
+- release archives must be signed with the matching private Ed25519 key
+- the appcast must include `sparkle:edSignature`
+
+This repository includes the required scripts and GitHub Actions wiring for that flow.

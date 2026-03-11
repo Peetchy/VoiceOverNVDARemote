@@ -13,6 +13,9 @@ let package = Package(
         .executable(name: "VONVDARemote", targets: ["VONVDARemote"]),
         .executable(name: "RelayProbe", targets: ["RelayProbe"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.7.3"),
+    ],
     targets: [
         .target(
             name: "RemoteProtocol"
@@ -27,7 +30,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "VONVDARemote",
-            dependencies: ["MacRemoteCore"]
+            dependencies: [
+                "MacRemoteCore",
+                .product(name: "Sparkle", package: "Sparkle"),
+            ]
         ),
         .executableTarget(
             name: "RelayProbe",

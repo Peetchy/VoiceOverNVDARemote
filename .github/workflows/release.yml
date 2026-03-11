@@ -41,10 +41,13 @@ jobs:
 
       - name: Build app bundle
         shell: bash
+        env:
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY || '' }}
         run: |
           APP_VERSION="${{ steps.version.outputs.version }}" \
           APP_BUILD="${{ steps.version.outputs.build }}" \
           APPCAST_URL="$APPCAST_URL" \
+          SPARKLE_PUBLIC_ED_KEY="$SPARKLE_PUBLIC_ED_KEY" \
           ./scripts/build_app.sh
 
       - name: Sign app when certificate is available
@@ -98,9 +101,14 @@ jobs:
           APPCAST_VERSION: ${{ steps.version.outputs.version }}
           APPCAST_BUILD: ${{ steps.version.outputs.build }}
           APPCAST_URL: https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/VO_NVDA_Remote.dmg
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY || '' }}
         run: |
           APPCAST_LENGTH="$(stat -f%z dist/VO_NVDA_Remote.dmg)"
           export APPCAST_LENGTH
+          if [[ -n "$SPARKLE_PRIVATE_ED_KEY" ]]; then
+            APPCAST_SIGNATURE="$(./scripts/sign_sparkle_update.sh dist/VO_NVDA_Remote.dmg)"
+            export APPCAST_SIGNATURE
+          fi
           ./scripts/generate_appcast.sh
 
       - name: Publish appcast to GitHub Pages branch
