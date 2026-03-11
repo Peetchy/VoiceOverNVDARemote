@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>VO NVDA Remote Updates</title>
+    <link>https://github.com/Peetchy/VoiceOverNVDARemote/releases/download/v0.1.1/VO_NVDA_Remote.dmg</link>
+    <description>Release feed for VO NVDA Remote</description>
+    <language>en</language>
+    <item>
+      <title>Version 0.1.1</title>
+      <pubDate>Wed, 11 Mar 2026 08:34:46 +0000</pubDate>
+      <sparkle:version>3</sparkle:version>
+      <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/Peetchy/VoiceOverNVDARemote/releases/download/v0.1.1/VO_NVDA_Remote.dmg"
+        length="474250"
+        type="application/octet-stream"
+        sparkle:edSignature="" />
+    </item>
+  </channel>
+</rss>
