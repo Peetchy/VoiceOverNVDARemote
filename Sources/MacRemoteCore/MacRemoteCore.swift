@@ -923,7 +923,9 @@ public final class RemoteSessionController: ObservableObject {
         case let .error(payload):
             snapshot.phase = .failed(payload.message)
             appendEvent("Remote error [\(payload.code)]: \(payload.message)")
-        case .protocolVersion, .join, .key, .sendSAS, .brailleInput:
+        case let .unsupported(type):
+            appendEvent("Ignored unsupported relay message: \(type)")
+        case .protocolVersion, .join, .key, .sendSAS, .brailleInput, .generateKey, .index:
             break
         }
     }

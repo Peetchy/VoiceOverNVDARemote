@@ -13,6 +13,7 @@ public enum RemoteMessageType: String, Codable, CaseIterable, Sendable {
     case channelJoined = "channel_joined"
     case clientJoined = "client_joined"
     case clientLeft = "client_left"
+    case generateKey = "generate_key"
     case key
     case speak
     case cancel
@@ -20,6 +21,7 @@ public enum RemoteMessageType: String, Codable, CaseIterable, Sendable {
     case tone
     case wave
     case sendSAS = "send_SAS"
+    case index
     case display
     case brailleInput = "braille_input"
     case setBrailleInfo = "set_braille_info"
@@ -246,6 +248,7 @@ public enum RemoteMessage: Equatable, Sendable {
     case channelJoined(ChannelJoinedPayload)
     case clientJoined(ClientJoinedPayload)
     case clientLeft(ClientLeftPayload)
+    case generateKey(String?)
     case key(KeyPayload)
     case speak(SpeakPayload)
     case cancel
@@ -253,6 +256,7 @@ public enum RemoteMessage: Equatable, Sendable {
     case tone(hz: Double, length: Double, left: Double, right: Double)
     case wave(fileName: String, asynchronous: Bool)
     case sendSAS
+    case index(Int?)
     case display(cells: [Int])
     case brailleInput(dots: Int?, space: Bool?, routingIndex: Int?)
     case setBrailleInfo(name: String, numCells: Int)
@@ -263,33 +267,7 @@ public enum RemoteMessage: Equatable, Sendable {
     case ping(PingPayload)
     case error(ErrorPayload)
     case nvdaNotConnected
-
-    public var type: RemoteMessageType {
-        switch self {
-        case .protocolVersion: .protocolVersion
-        case .join: .join
-        case .channelJoined: .channelJoined
-        case .clientJoined: .clientJoined
-        case .clientLeft: .clientLeft
-        case .key: .key
-        case .speak: .speak
-        case .cancel: .cancel
-        case .pauseSpeech: .pauseSpeech
-        case .tone: .tone
-        case .wave: .wave
-        case .sendSAS: .sendSAS
-        case .display: .display
-        case .brailleInput: .brailleInput
-        case .setBrailleInfo: .setBrailleInfo
-        case .setDisplaySize: .setDisplaySize
-        case .setClipboardText: .setClipboardText
-        case .motd: .motd
-        case .versionMismatch: .versionMismatch
-        case .ping: .ping
-        case .error: .error
-        case .nvdaNotConnected: .nvdaNotConnected
-        }
-    }
+    case unsupported(String)
 }
 
 public struct RemoteEnvelope: Equatable, Sendable {
@@ -310,6 +288,8 @@ extension RemoteEnvelope: Codable {
         case channel
         case userID = "user_id"
         case userIDs = "user_ids"
+        case key
+        case index
         case connectionType = "connection_type"
         case clients
         case client
@@ -343,25 +323,25 @@ extension RemoteEnvelope: Codable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(RemoteMessageType.self, forKey: .type)
+        let type = try container.decode(String.self, forKey: .type)
         let origin = try container.decodeIfPresent(Int.self, forKey: .origin)
         self.origin = origin
         switch type {
-        case .protocolVersion:
+        case RemoteMessageType.protocolVersion.rawValue:
             self.message = .protocolVersion(.init(version: try container.decode(Int.self, forKey: .version)))
-        case .join:
+        case RemoteMessageType.join.rawValue:
             self.message = .join(.init(
                 channel: try container.decode(String.self, forKey: .channel),
                 connectionType: try container.decode(RemoteRole.self, forKey: .connectionType)
             ))
-        case .channelJoined:
+        case RemoteMessageType.channelJoined.rawValue:
             self.message = .channelJoined(.init(
                 channel: try container.decode(String.self, forKey: .channel),
                 clients: try container.decodeIfPresent([RemoteClientDescriptor].self, forKey: .clients) ?? []
             ))
-        case .clientJoined:
+        case RemoteMessageType.clientJoined.rawValue:
             self.message = .clientJoined(.init(client: try container.decode(RemoteClientDescriptor.self, forKey: .client)))
-        case .clientLeft:
+        case RemoteMessageType.clientLeft.rawValue:
             let clientID = try container.decodeIfPresent(Int.self, forKey: .clientID)
                 ?? container.decodeIfPresent(Int.self, forKey: .userID)
                 ?? container.decodeIfPresent(Int.self, forKey: .client)
@@ -372,72 +352,129 @@ extension RemoteEnvelope: Codable {
                 )
             }
             self.message = .clientLeft(.init(clientID: clientID))
-        case .key:
+        case RemoteMessageType.generateKey.rawValue:
+            self.message = .generateKey(try container.decodeIfPresent(String.self, forKey: .key))
+        case RemoteMessageType.key.rawValue:
             self.message = .key(.init(
                 vkCode: try container.decode(UInt16.self, forKey: .vkCode),
                 scanCode: try container.decodeIfPresent(UInt16.self, forKey: .scanCode),
                 extended: try container.decode(Bool.self, forKey: .extended),
                 pressed: try container.decode(Bool.self, forKey: .pressed)
             ))
-        case .speak:
+        case RemoteMessageType.speak.rawValue:
             self.message = .speak(.init(
                 sequence: try container.decode([SpeechSequenceItem].self, forKey: .sequence),
                 priority: try container.decodeIfPresent(String.self, forKey: .priority) ?? "normal"
             ))
-        case .cancel:
+        case RemoteMessageType.cancel.rawValue:
             self.message = .cancel
-        case .pauseSpeech:
+        case RemoteMessageType.pauseSpeech.rawValue:
             self.message = .pauseSpeech(try container.decode(Bool.self, forKey: .switchValue))
-        case .tone:
+        case RemoteMessageType.tone.rawValue:
             self.message = .tone(
                 hz: try container.decode(Double.self, forKey: .hz),
                 length: try container.decode(Double.self, forKey: .length),
                 left: try container.decode(Double.self, forKey: .left),
                 right: try container.decode(Double.self, forKey: .right)
             )
-        case .wave:
+        case RemoteMessageType.wave.rawValue:
             self.message = .wave(
                 fileName: try container.decode(String.self, forKey: .fileName),
                 asynchronous: try container.decodeIfPresent(Bool.self, forKey: .asynchronous) ?? false
             )
-        case .sendSAS:
+        case RemoteMessageType.sendSAS.rawValue:
             self.message = .sendSAS
-        case .display:
+        case RemoteMessageType.index.rawValue:
+            self.message = .index(try container.decodeIfPresent(Int.self, forKey: .index))
+        case RemoteMessageType.display.rawValue:
             self.message = .display(cells: try container.decode([Int].self, forKey: .cells))
-        case .brailleInput:
+        case RemoteMessageType.brailleInput.rawValue:
             self.message = .brailleInput(
                 dots: try container.decodeIfPresent(Int.self, forKey: .dots),
                 space: try container.decodeIfPresent(Bool.self, forKey: .space),
                 routingIndex: try container.decodeIfPresent(Int.self, forKey: .routingIndex)
             )
-        case .setBrailleInfo:
+        case RemoteMessageType.setBrailleInfo.rawValue:
             self.message = .setBrailleInfo(
                 name: try container.decode(String.self, forKey: .name),
                 numCells: try container.decode(Int.self, forKey: .numCells)
             )
-        case .setDisplaySize:
+        case RemoteMessageType.setDisplaySize.rawValue:
             self.message = .setDisplaySize(sizes: try container.decode([Int].self, forKey: .sizes))
-        case .setClipboardText:
+        case RemoteMessageType.setClipboardText.rawValue:
             self.message = .setClipboardText(.init(text: try container.decode(String.self, forKey: .text)))
-        case .motd:
+        case RemoteMessageType.motd.rawValue:
             self.message = .motd(.init(
                 motd: try container.decode(String.self, forKey: .motd),
                 forceDisplay: try container.decodeIfPresent(Bool.self, forKey: .forceDisplay) ?? false
             ))
-        case .versionMismatch:
+        case RemoteMessageType.versionMismatch.rawValue:
             self.message = .versionMismatch
-        case .ping:
+        case RemoteMessageType.ping.rawValue:
             self.message = .ping(.init())
-        case .error:
+        case RemoteMessageType.error.rawValue:
             self.message = .error(try ErrorPayload(from: decoder))
-        case .nvdaNotConnected:
+        case RemoteMessageType.nvdaNotConnected.rawValue:
             self.message = .nvdaNotConnected
+        default:
+            self.message = .unsupported(type)
         }
     }
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(message.type, forKey: .type)
+        switch message {
+        case .protocolVersion:
+            try container.encode(RemoteMessageType.protocolVersion.rawValue, forKey: .type)
+        case .join:
+            try container.encode(RemoteMessageType.join.rawValue, forKey: .type)
+        case .channelJoined:
+            try container.encode(RemoteMessageType.channelJoined.rawValue, forKey: .type)
+        case .clientJoined:
+            try container.encode(RemoteMessageType.clientJoined.rawValue, forKey: .type)
+        case .clientLeft:
+            try container.encode(RemoteMessageType.clientLeft.rawValue, forKey: .type)
+        case .generateKey:
+            try container.encode(RemoteMessageType.generateKey.rawValue, forKey: .type)
+        case .key:
+            try container.encode(RemoteMessageType.key.rawValue, forKey: .type)
+        case .speak:
+            try container.encode(RemoteMessageType.speak.rawValue, forKey: .type)
+        case .cancel:
+            try container.encode(RemoteMessageType.cancel.rawValue, forKey: .type)
+        case .pauseSpeech:
+            try container.encode(RemoteMessageType.pauseSpeech.rawValue, forKey: .type)
+        case .tone:
+            try container.encode(RemoteMessageType.tone.rawValue, forKey: .type)
+        case .wave:
+            try container.encode(RemoteMessageType.wave.rawValue, forKey: .type)
+        case .sendSAS:
+            try container.encode(RemoteMessageType.sendSAS.rawValue, forKey: .type)
+        case .index:
+            try container.encode(RemoteMessageType.index.rawValue, forKey: .type)
+        case .display:
+            try container.encode(RemoteMessageType.display.rawValue, forKey: .type)
+        case .brailleInput:
+            try container.encode(RemoteMessageType.brailleInput.rawValue, forKey: .type)
+        case .setBrailleInfo:
+            try container.encode(RemoteMessageType.setBrailleInfo.rawValue, forKey: .type)
+        case .setDisplaySize:
+            try container.encode(RemoteMessageType.setDisplaySize.rawValue, forKey: .type)
+        case .setClipboardText:
+            try container.encode(RemoteMessageType.setClipboardText.rawValue, forKey: .type)
+        case .motd:
+            try container.encode(RemoteMessageType.motd.rawValue, forKey: .type)
+        case .versionMismatch:
+            try container.encode(RemoteMessageType.versionMismatch.rawValue, forKey: .type)
+        case .ping:
+            try container.encode(RemoteMessageType.ping.rawValue, forKey: .type)
+        case .error:
+            try container.encode(RemoteMessageType.error.rawValue, forKey: .type)
+        case .nvdaNotConnected:
+            try container.encode(RemoteMessageType.nvdaNotConnected.rawValue, forKey: .type)
+        case let .unsupported(type):
+            try container.encode(type, forKey: .type)
+        }
         try container.encodeIfPresent(origin, forKey: .origin)
         switch message {
         case let .protocolVersion(payload):
@@ -452,6 +489,8 @@ extension RemoteEnvelope: Codable {
             try container.encode(payload.client, forKey: .client)
         case let .clientLeft(payload):
             try container.encode(payload.clientID, forKey: .clientID)
+        case let .generateKey(key):
+            try container.encodeIfPresent(key, forKey: .key)
         case let .key(payload):
             try container.encode(payload.vkCode, forKey: .vkCode)
             try container.encodeIfPresent(payload.scanCode, forKey: .scanCode)
@@ -474,6 +513,8 @@ extension RemoteEnvelope: Codable {
             try container.encode(asynchronous, forKey: .asynchronous)
         case .sendSAS:
             break
+        case let .index(index):
+            try container.encodeIfPresent(index, forKey: .index)
         case let .display(cells):
             try container.encode(cells, forKey: .cells)
         case let .brailleInput(dots, space, routingIndex):
@@ -498,6 +539,8 @@ extension RemoteEnvelope: Codable {
             try container.encode(payload.code, forKey: .code)
             try container.encode(payload.message, forKey: .message)
         case .nvdaNotConnected:
+            break
+        case .unsupported:
             break
         }
     }

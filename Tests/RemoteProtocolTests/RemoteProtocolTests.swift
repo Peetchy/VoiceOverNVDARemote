@@ -43,4 +43,13 @@ final class RemoteProtocolTests: XCTestCase {
 
         XCTAssertEqual(decoded, RemoteEnvelope(message: .error(.init(code: "error", message: "incorrect_password"))))
     }
+
+    func testUnknownMessageTypeIsPreservedAsUnsupported() throws {
+        let serializer = NewlineDelimitedJSONSerializer()
+        let payload = #"{"type":"mystery_packet","value":1}"#.data(using: .utf8)!
+
+        let decoded = try serializer.deserialize(payload)
+
+        XCTAssertEqual(decoded, RemoteEnvelope(message: .unsupported("mystery_packet")))
+    }
 }
