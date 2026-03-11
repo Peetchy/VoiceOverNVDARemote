@@ -4,20 +4,20 @@
      xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>VO NVDA Remote Updates</title>
-    <link>https://github.com/Peetchy/VoiceOverNVDARemote/releases/download/v0.1.1/VO_NVDA_Remote.dmg</link>
+    <link>https://github.com/Peetchy/VoiceOverNVDARemote/releases/download/v0.1.6/VO_NVDA_Remote.dmg</link>
     <description>Release feed for VO NVDA Remote</description>
     <language>en</language>
     <item>
-      <title>Version 0.1.1</title>
-      <pubDate>Wed, 11 Mar 2026 08:35:08 +0000</pubDate>
-      <sparkle:version>4</sparkle:version>
-      <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+      <title>Version 0.1.6</title>
+      <pubDate>Wed, 11 Mar 2026 10:15:06 +0000</pubDate>
+      <sparkle:version>10</sparkle:version>
+      <sparkle:shortVersionString>0.1.6</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <enclosure
-        url="https://github.com/Peetchy/VoiceOverNVDARemote/releases/download/v0.1.1/VO_NVDA_Remote.dmg"
-        length="474247"
+        url="https://github.com/Peetchy/VoiceOverNVDARemote/releases/download/v0.1.6/VO_NVDA_Remote.dmg"
+        length="1442507"
         type="application/octet-stream"
-        sparkle:edSignature="" />
+        sparkle:edSignature="WWMxEn6Unoh3i28BzGSay9EZ/1DnSgUmkdPiW7GfY6wDu0WUysRottcAqMQpmkgyUE/LcQ0d/Y6awQS+k9l+Bg==" />
     </item>
   </channel>
 </rss>
