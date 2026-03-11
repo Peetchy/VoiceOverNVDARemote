@@ -647,6 +647,7 @@ public final class RemoteSessionController: ObservableObject {
     private let stopControlKey: UInt16 = 0x7B
     private var activeRemoteKeys: Set<ActiveRemoteKey> = []
     private var pendingModifierEvents: [CapturedKeyEvent] = []
+    private var autoReleaseModifierKeys: Set<ActiveRemoteKey> = []
     private var queuedCapturedEvents: [CapturedKeyEvent] = []
     private var isProcessingCapturedEvents = false
 
@@ -720,6 +721,7 @@ public final class RemoteSessionController: ObservableObject {
     public func disconnect() async {
         stopControllingLocally(reason: nil)
         pendingModifierEvents.removeAll(keepingCapacity: false)
+        autoReleaseModifierKeys.removeAll(keepingCapacity: false)
         queuedCapturedEvents.removeAll(keepingCapacity: false)
         await releaseActiveRemoteKeys()
         await transport.disconnect()
@@ -753,6 +755,7 @@ public final class RemoteSessionController: ObservableObject {
         case .controlling:
             stopControllingLocally(reason: "Controlling local machine")
             pendingModifierEvents.removeAll(keepingCapacity: false)
+            autoReleaseModifierKeys.removeAll(keepingCapacity: false)
             Task {
                 await releaseActiveRemoteKeys()
             }
@@ -928,12 +931,14 @@ public final class RemoteSessionController: ObservableObject {
         if event.isToggleHotKey, event.pressed {
             stopControllingLocally(reason: "Controlling local machine")
             pendingModifierEvents.removeAll(keepingCapacity: false)
+            autoReleaseModifierKeys.removeAll(keepingCapacity: false)
             await releaseActiveRemoteKeys()
             return
         }
         if event.vkCode == stopControlKey, event.pressed {
             stopControllingLocally(reason: "Controlling local machine")
             pendingModifierEvents.removeAll(keepingCapacity: false)
+            autoReleaseModifierKeys.removeAll(keepingCapacity: false)
             await releaseActiveRemoteKeys()
             return
         }
@@ -946,6 +951,9 @@ public final class RemoteSessionController: ObservableObject {
         }
         appendEvent("Captured key \(event.vkCode) \(event.pressed ? "down" : "up")")
         await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: event.pressed)
+        if !event.pressed {
+            await releaseAutoReleaseModifiers()
+        }
     }
 
     private func trackRemoteKeyState(vkCode: UInt16, extended: Bool, pressed: Bool) {
@@ -987,15 +995,23 @@ public final class RemoteSessionController: ObservableObject {
             if !pendingModifierEvents.contains(where: { $0.vkCode == event.vkCode && $0.extended == event.extended }) &&
                 !activeRemoteKeys.contains(key) {
                 pendingModifierEvents.append(event)
+                if shouldAutoReleaseModifier(event.vkCode) {
+                    autoReleaseModifierKeys.insert(key)
+                }
             }
             return
         }
         if let index = pendingModifierEvents.firstIndex(where: { $0.vkCode == event.vkCode && $0.extended == event.extended }) {
             let pending = pendingModifierEvents.remove(at: index)
+            autoReleaseModifierKeys.remove(key)
             appendEvent("Captured key \(pending.vkCode) down")
             await sendRemoteKey(vkCode: pending.vkCode, scanCode: pending.scanCode, extended: pending.extended, pressed: true)
             appendEvent("Captured key \(event.vkCode) up")
             await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: false)
+            return
+        }
+        if !activeRemoteKeys.contains(key) {
+            autoReleaseModifierKeys.remove(key)
             return
         }
         appendEvent("Captured key \(event.vkCode) up")
@@ -1011,9 +1027,22 @@ public final class RemoteSessionController: ObservableObject {
         }
     }
 
+    private func releaseAutoReleaseModifiers() async {
+        let keysToRelease = autoReleaseModifierKeys.filter { activeRemoteKeys.contains($0) }
+        autoReleaseModifierKeys.subtract(keysToRelease)
+        for key in keysToRelease {
+            appendEvent("Captured key \(key.vkCode) up")
+            await sendRemoteKey(vkCode: key.vkCode, scanCode: MacVirtualKeyMapper.windowsScanCode(for: key.vkCode), extended: key.extended, pressed: false)
+        }
+    }
+
+    private func shouldAutoReleaseModifier(_ vkCode: UInt16) -> Bool {
+        vkCode == 0x14
+    }
+
     private func isBufferedModifier(_ vkCode: UInt16) -> Bool {
         switch vkCode {
-        case 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C:
+        case 0x14, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C:
             return true
         default:
             return false
