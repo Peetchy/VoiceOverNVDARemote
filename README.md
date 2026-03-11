@@ -122,6 +122,8 @@ Optional scripts are included for signed public builds:
 
 Required secrets/variables are described in [docs/releases.md](/Users/itsawatbanlawanich/projects/vo-remote-desktop/vo-nvda-remote/docs/releases.md)
 
+Unsigned builds are ad-hoc signed so the bundle is structurally valid, but public downloads still need Developer ID signing and notarization if you want Gatekeeper to open them normally on other Macs.
+
 ## Auto-update note
 
 The app now includes Sparkle runtime support.

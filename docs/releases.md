@@ -42,6 +42,7 @@ Add this repository variable for in-app Sparkle verification:
 - `SPARKLE_PUBLIC_ED_KEY`
 
 If those secrets are absent, the workflow still publishes unsigned public release assets and an appcast.
+Those unsigned assets are useful for internal testing, but macOS Gatekeeper on a different machine may still block them until you add Developer ID signing and notarization secrets.
 
 ## Appcast URL
 

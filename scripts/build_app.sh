@@ -76,4 +76,8 @@ fi
 touch "$CONTENTS_DIR/PkgInfo"
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
 
+# Produce a valid bundle signature even when no Developer ID certificate is configured.
+codesign --force --deep --sign - "$APP_DIR"
+codesign --verify --deep --strict --verbose=2 "$APP_DIR"
+
 echo "Created app bundle at: $APP_DIR"

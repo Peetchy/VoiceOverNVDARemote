@@ -41,6 +41,8 @@ Notes:
 
 - First launch may require granting Accessibility access if you use `Whole Session` key capture.
 - `App Only` capture works without Accessibility permission but only while the app window is active.
+- `build_app.sh` applies an ad-hoc signature so the bundle is structurally valid for local use.
+- For public distribution on other Macs, use Developer ID signing and notarization or Gatekeeper may still block the app.
 
 ## Sign
 
