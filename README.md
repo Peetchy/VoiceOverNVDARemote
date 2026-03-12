@@ -19,13 +19,34 @@ This project is designed for VoiceOver users on macOS who need to connect to an 
 - Publishes public GitHub release assets and appcast feed
 - Supports app-only and whole-session key capture modes
 
+## Recommended VoiceOver setup
+
+Create a dedicated VoiceOver activity for `VO NVDA Remote` in VoiceOver Utility and use that activity when working with the app.
+
+Setup steps:
+
+1. Open `VoiceOver Utility` on macOS.
+2. Go to the `Activities` category.
+3. Create a new activity named `VO NVDA Remote`.
+4. Configure the activity so it is used with `VO NVDA Remote`.
+5. In that activity, set `VoiceOver modifier keys` to `Control + Option` only.
+6. In that activity, turn `Announce when the Caps Lock key is pressed` off.
+7. Save the activity and activate it before starting a remote control session.
+
+Recommended activity settings:
+
+- Set `VoiceOver modifier keys` to `Control + Option` only
+- Turn `Announce when the Caps Lock key is pressed` off
+
+This avoids conflicts between the NVDA key (`Caps Lock`) used by the remote Windows machine and the local VoiceOver key on macOS.
+
 ## How to use
 
 1. Launch the app.
 2. Enter the relay `Host`, `Port`, and `Session Key`.
 3. Press `Connect`.
 4. After the session is connected, press `Start Control` to begin sending keyboard input to the Windows machine.
-5. Press `F12` to stop controlling and return the keyboard to the Mac.
+5. Press your configured global toggle hotkey to stop controlling and return the keyboard to the Mac.
 
 Before the session connects, the app intentionally hides controls and details that only apply to an active remote session.
 
@@ -132,10 +153,6 @@ swift run KeyCaptureProbe
 
 If `Whole Session` is selected and Accessibility access is missing, the app exposes controls to refresh permission state or open the relevant macOS settings page.
 
-Default stop-control key:
-
-- `F12`
-
 ## Global toggle hotkey
 
 The toggle hotkey is configurable from the main window. Current options:
@@ -145,6 +162,7 @@ The toggle hotkey is configurable from the main window. Current options:
 
 This hotkey toggles remote control mode while the app is running.
 Default selection: `F12`.
+`F12` by itself toggles control locally, while `Caps Lock+F12` remains available for the remote NVDA command.
 
 ## Speech output
 
@@ -156,36 +174,6 @@ Remote speech output can be routed to either:
 This setting changes how incoming NVDA speech is presented on macOS, without changing the relay protocol itself.
 
 For the best experience with `VoiceOver` output, allow VoiceOver to be controlled by scripts in VoiceOver Utility so the app can reliably interact with VoiceOver during use.
-
-## Recommended VoiceOver setup
-
-Create a dedicated VoiceOver activity for `VO NVDA Remote` in VoiceOver Utility and use that activity when working with the app.
-
-คำแนะนำภาษาไทย:
-
-- สร้าง VoiceOver activity แยกสำหรับ `VO NVDA Remote`
-- ใช้ activity นี้เฉพาะตอนใช้งานแอป `VO NVDA Remote`
-- ตั้ง `VoiceOver modifier keys` ให้เป็น `Control + Option` เท่านั้น
-- ปิด `Announce when the Caps Lock key is pressed`
-
-การตั้งค่านี้ช่วยลดปัญหาปุ่ม `Caps Lock` ชนกันระหว่างปุ่ม NVDA key ของเครื่อง Windows ปลายทาง กับการใช้งาน VoiceOver บนเครื่อง Mac
-
-Setup steps:
-
-1. Open `VoiceOver Utility` on macOS.
-2. Go to the `Activities` category.
-3. Create a new activity named `VO NVDA Remote`.
-4. Configure the activity so it is used with `VO NVDA Remote`.
-5. In that activity, set `VoiceOver modifier keys` to `Control + Option` only.
-6. In that activity, turn `Announce when the Caps Lock key is pressed` off.
-7. Save the activity and activate it before starting a remote control session.
-
-Recommended activity settings:
-
-- Set `VoiceOver modifier keys` to `Control + Option` only
-- Turn `Announce when the Caps Lock key is pressed` off
-
-This avoids conflicts between the NVDA key (`Caps Lock`) used by the remote Windows machine and the local VoiceOver key on macOS.
 
 ## Custom keymap
 

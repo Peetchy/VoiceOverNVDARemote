@@ -55,16 +55,19 @@ public struct ToggleHotKey: Codable, Equatable, Hashable, Sendable {
         displayName: "F12"
     )
 
-    fileprivate func matches(keyCode: UInt16, modifiers: CGEventFlags) -> Bool {
+    func matches(keyCode: UInt16, modifiers: CGEventFlags) -> Bool {
         keyCode == self.keyCode && modifiers.intersection(Self.cgComparableFlags) == requiredCGEventFlags
     }
 
-    fileprivate func matches(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
+    func matches(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
         keyCode == self.keyCode && modifiers.intersection(Self.nsComparableFlags) == requiredNSEventFlags
     }
 
     private var requiredCGEventFlags: CGEventFlags {
         var flags: CGEventFlags = []
+        if modifiers & UInt32(alphaLock) != 0 {
+            flags.insert(.maskAlphaShift)
+        }
         if modifiers & UInt32(controlKey) != 0 {
             flags.insert(.maskControl)
         }
@@ -82,6 +85,9 @@ public struct ToggleHotKey: Codable, Equatable, Hashable, Sendable {
 
     private var requiredNSEventFlags: NSEvent.ModifierFlags {
         var flags: NSEvent.ModifierFlags = []
+        if modifiers & UInt32(alphaLock) != 0 {
+            flags.insert(.capsLock)
+        }
         if modifiers & UInt32(controlKey) != 0 {
             flags.insert(.control)
         }
@@ -97,8 +103,8 @@ public struct ToggleHotKey: Codable, Equatable, Hashable, Sendable {
         return flags
     }
 
-    private static let cgComparableFlags: CGEventFlags = [.maskControl, .maskCommand, .maskAlternate, .maskShift]
-    private static let nsComparableFlags: NSEvent.ModifierFlags = [.control, .command, .option, .shift]
+    private static let cgComparableFlags: CGEventFlags = [.maskAlphaShift, .maskControl, .maskCommand, .maskAlternate, .maskShift]
+    private static let nsComparableFlags: NSEvent.ModifierFlags = [.capsLock, .control, .command, .option, .shift]
 }
 
 public enum GlobalToggleHotKeyOption: String, CaseIterable, Codable, Equatable, Sendable {
@@ -970,10 +976,10 @@ public final class RemoteSessionController: ObservableObject {
     private let globalHotKeyManager: GlobalHotKeyManaging
     private let settingsStore: RemoteSettingsStoring
     private var settings: RemoteAppSettings
-    private let stopControlKey: UInt16 = 0x7B
     private var activeRemoteKeys: Set<ActiveRemoteKey> = []
     private var bufferedChordEvents: [ActiveRemoteKey: CapturedKeyEvent] = [:]
     private var bufferedChordOrder: [ActiveRemoteKey] = []
+    private var physicallyHeldChordModifiers: Set<ActiveRemoteKey> = []
     private var suppressedPhysicalKeyUps: Set<ActiveRemoteKey> = []
     private var queuedCapturedEvents: [CapturedKeyEvent] = []
     private var isProcessingCapturedEvents = false
@@ -1091,6 +1097,7 @@ public final class RemoteSessionController: ObservableObject {
         stopControllingLocally(reason: nil)
         bufferedChordEvents.removeAll(keepingCapacity: false)
         bufferedChordOrder.removeAll(keepingCapacity: false)
+        physicallyHeldChordModifiers.removeAll(keepingCapacity: false)
         suppressedPhysicalKeyUps.removeAll(keepingCapacity: false)
         queuedCapturedEvents.removeAll(keepingCapacity: false)
         await releaseActiveRemoteKeys()
@@ -1127,6 +1134,7 @@ public final class RemoteSessionController: ObservableObject {
             stopControllingLocally(reason: "Controlling local machine")
             bufferedChordEvents.removeAll(keepingCapacity: false)
             bufferedChordOrder.removeAll(keepingCapacity: false)
+            physicallyHeldChordModifiers.removeAll(keepingCapacity: false)
             suppressedPhysicalKeyUps.removeAll(keepingCapacity: false)
             Task {
                 await releaseActiveRemoteKeys()
@@ -1314,24 +1322,19 @@ public final class RemoteSessionController: ObservableObject {
             stopControllingLocally(reason: "Controlling local machine")
             bufferedChordEvents.removeAll(keepingCapacity: false)
             bufferedChordOrder.removeAll(keepingCapacity: false)
-            suppressedPhysicalKeyUps.removeAll(keepingCapacity: false)
-            await releaseActiveRemoteKeys()
-            return
-        }
-        if event.vkCode == stopControlKey, event.pressed {
-            stopControllingLocally(reason: "Controlling local machine")
-            bufferedChordEvents.removeAll(keepingCapacity: false)
-            bufferedChordOrder.removeAll(keepingCapacity: false)
+            physicallyHeldChordModifiers.removeAll(keepingCapacity: false)
             suppressedPhysicalKeyUps.removeAll(keepingCapacity: false)
             await releaseActiveRemoteKeys()
             return
         }
         let key = ActiveRemoteKey(vkCode: event.vkCode, extended: event.extended)
+        trackPhysicalChordModifierState(for: event, key: key)
         if suppressedPhysicalKeyUps.contains(key), !event.pressed {
             suppressedPhysicalKeyUps.remove(key)
             return
         }
         if event.pressed {
+            restoreImplicitChordModifiersIfNeeded(before: event)
             bufferCapturedKeyDown(event)
             return
         }
@@ -1437,6 +1440,30 @@ public final class RemoteSessionController: ObservableObject {
     private func removeBufferedChordKey(_ key: ActiveRemoteKey) {
         bufferedChordEvents.removeValue(forKey: key)
         bufferedChordOrder.removeAll { $0 == key }
+    }
+
+    private func trackPhysicalChordModifierState(for event: CapturedKeyEvent, key: ActiveRemoteKey) {
+        guard isChordModifier(event.vkCode) else { return }
+        if event.pressed {
+            physicallyHeldChordModifiers.insert(key)
+        } else {
+            physicallyHeldChordModifiers.remove(key)
+        }
+    }
+
+    private func restoreImplicitChordModifiersIfNeeded(before event: CapturedKeyEvent) {
+        guard event.vkCode != 0x14 else { return }
+        let capsLockKey = ActiveRemoteKey(vkCode: 0x14, extended: false)
+        guard physicallyHeldChordModifiers.contains(capsLockKey) else { return }
+        guard !activeRemoteKeys.contains(capsLockKey), bufferedChordEvents[capsLockKey] == nil else { return }
+        bufferCapturedKeyDown(
+            .init(
+                vkCode: 0x14,
+                scanCode: MacVirtualKeyMapper.windowsScanCode(for: 0x14),
+                extended: false,
+                pressed: true
+            )
+        )
     }
 
     private func shouldAutoReleaseModifier(_ vkCode: UInt16) -> Bool {

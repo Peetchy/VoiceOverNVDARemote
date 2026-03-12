@@ -82,7 +82,7 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text("While controlling, local key events are captured. Press F12 to return control to this Mac.")
+                Text("While controlling, local key events are captured. Use the configured global toggle hotkey to return control to this Mac.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
