@@ -4,6 +4,11 @@ VO NVDA Remote is a macOS utility app that connects to the original NVDA Remote 
 
 This project is designed for VoiceOver users on macOS who need to connect to an NVDA Remote session and control a Windows machine through the public `nvdaremote` ecosystem.
 
+## Developer
+
+- Itsawat Banlawanich
+- Email: peet.itsawat@gmail.com
+
 ## Current status
 
 - Connects to `nvdaremote.com` over raw TLS using NVDA Remote protocol v2
@@ -151,6 +156,36 @@ Remote speech output can be routed to either:
 This setting changes how incoming NVDA speech is presented on macOS, without changing the relay protocol itself.
 
 For the best experience with `VoiceOver` output, allow VoiceOver to be controlled by scripts in VoiceOver Utility so the app can reliably interact with VoiceOver during use.
+
+## Recommended VoiceOver setup
+
+Create a dedicated VoiceOver activity for `VO NVDA Remote` in VoiceOver Utility and use that activity when working with the app.
+
+คำแนะนำภาษาไทย:
+
+- สร้าง VoiceOver activity แยกสำหรับ `VO NVDA Remote`
+- ใช้ activity นี้เฉพาะตอนใช้งานแอป `VO NVDA Remote`
+- ตั้ง `VoiceOver modifier keys` ให้เป็น `Control + Option` เท่านั้น
+- ปิด `Announce when the Caps Lock key is pressed`
+
+การตั้งค่านี้ช่วยลดปัญหาปุ่ม `Caps Lock` ชนกันระหว่างปุ่ม NVDA key ของเครื่อง Windows ปลายทาง กับการใช้งาน VoiceOver บนเครื่อง Mac
+
+Setup steps:
+
+1. Open `VoiceOver Utility` on macOS.
+2. Go to the `Activities` category.
+3. Create a new activity named `VO NVDA Remote`.
+4. Configure the activity so it is used with `VO NVDA Remote`.
+5. In that activity, set `VoiceOver modifier keys` to `Control + Option` only.
+6. In that activity, turn `Announce when the Caps Lock key is pressed` off.
+7. Save the activity and activate it before starting a remote control session.
+
+Recommended activity settings:
+
+- Set `VoiceOver modifier keys` to `Control + Option` only
+- Turn `Announce when the Caps Lock key is pressed` off
+
+This avoids conflicts between the NVDA key (`Caps Lock`) used by the remote Windows machine and the local VoiceOver key on macOS.
 
 ## Custom keymap
 

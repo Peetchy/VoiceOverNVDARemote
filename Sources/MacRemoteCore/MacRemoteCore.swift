@@ -564,7 +564,9 @@ public final class EventTapKeyCapture: KeyCaptureManaging {
         }
         let unmanaged = Unmanaged.passUnretained(self)
         guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
+            // Intercept at the HID layer so Caps Lock does not toggle the local Mac
+            // while remote control owns the keyboard.
+            tap: .cghidEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
             eventsOfInterest: CGEventMask(mask),
