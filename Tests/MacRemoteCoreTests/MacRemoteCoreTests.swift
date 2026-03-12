@@ -38,6 +38,7 @@ final class MacRemoteCoreTests: XCTestCase {
     func testAnnouncementUpdatesSnapshotAndPostsToBridge() async throws {
         let transport = MockTransport()
         let announcer = MockAnnouncer()
+        let textSpeaker = MockTextSpeaker()
         let keyCapture = MockKeyCapture()
         let permissionChecker = MockPermissionChecker(isTrusted: true)
         let hotKeyManager = MockGlobalHotKeyManager()
@@ -45,6 +46,7 @@ final class MacRemoteCoreTests: XCTestCase {
         let controller = RemoteSessionController(
             transport: transport,
             announcer: announcer,
+            textSpeaker: textSpeaker,
             clipboard: MockClipboard(),
             keyCapture: keyCapture,
             permissionChecker: permissionChecker,
@@ -58,6 +60,33 @@ final class MacRemoteCoreTests: XCTestCase {
 
         XCTAssertEqual(controller.snapshot.latestAnnouncement, "focused on desktop")
         XCTAssertEqual(announcer.messages, ["focused on desktop"])
+        XCTAssertTrue(textSpeaker.messages.isEmpty)
+    }
+
+    @MainActor
+    func testSpeechOutputCanSwitchToTTS() async throws {
+        let transport = MockTransport()
+        let announcer = MockAnnouncer()
+        let textSpeaker = MockTextSpeaker()
+        let controller = RemoteSessionController(
+            transport: transport,
+            announcer: announcer,
+            textSpeaker: textSpeaker,
+            clipboard: MockClipboard(),
+            keyCapture: MockKeyCapture(),
+            permissionChecker: MockPermissionChecker(isTrusted: true),
+            globalHotKeyManager: MockGlobalHotKeyManager(),
+            settingsStore: MockSettingsStore()
+        )
+
+        controller.setSpeechOutputMode(.tts)
+        await controller.connect(using: sampleConfiguration(role: .master))
+        transport.emit(.message(.init(message: .speak(.init(sequence: [.text("run dialog")], priority: "high")))))
+        await settle()
+
+        XCTAssertEqual(controller.snapshot.speechOutputMode, .tts)
+        XCTAssertEqual(textSpeaker.messages, ["run dialog"])
+        XCTAssertTrue(announcer.messages.isEmpty)
     }
 
     @MainActor
@@ -86,6 +115,29 @@ final class MacRemoteCoreTests: XCTestCase {
 
         XCTAssertTrue(transport.sentMessages.contains { $0.message == .setClipboardText(.init(text: "copy me")) })
         XCTAssertEqual(clipboard.value, "from windows")
+    }
+
+    @MainActor
+    func testCopyLatestTextToClipboardUsesMostRecentSpeech() async throws {
+        let transport = MockTransport()
+        let clipboard = MockClipboard()
+        let controller = RemoteSessionController(
+            transport: transport,
+            announcer: MockAnnouncer(),
+            textSpeaker: MockTextSpeaker(),
+            clipboard: clipboard,
+            keyCapture: MockKeyCapture(),
+            permissionChecker: MockPermissionChecker(isTrusted: true),
+            globalHotKeyManager: MockGlobalHotKeyManager(),
+            settingsStore: MockSettingsStore()
+        )
+
+        await controller.connect(using: sampleConfiguration(role: .master))
+        transport.emit(.message(.init(message: .speak(.init(sequence: [.text("open start menu")], priority: "high")))))
+        await settle()
+        controller.copyLatestTextToClipboard()
+
+        XCTAssertEqual(clipboard.value, "open start menu")
     }
 
     @MainActor
@@ -264,7 +316,7 @@ final class MacRemoteCoreTests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsPersistenceUpdatesScopeOnly() async throws {
+    func testSettingsPersistenceUpdatesScopeAndDefaults() async throws {
         let transport = MockTransport()
         let keyCapture = MockKeyCapture()
         let permissionChecker = MockPermissionChecker(isTrusted: true)
@@ -283,8 +335,77 @@ final class MacRemoteCoreTests: XCTestCase {
         controller.setKeyCaptureScope(.application)
 
         XCTAssertEqual(settingsStore.savedSettings.last?.keyCaptureScope, .application)
-        XCTAssertEqual(hotKeyManager.registeredHotKeys.last, .fixedControlCommandBacktick)
-        XCTAssertEqual(controller.snapshot.globalHotKeyDisplay, ToggleHotKey.fixedControlCommandBacktick.displayName)
+        XCTAssertEqual(hotKeyManager.registeredHotKeys.last, GlobalToggleHotKeyOption.controlShiftCommandR.hotKey)
+        XCTAssertEqual(controller.snapshot.globalHotKeyDisplay, GlobalToggleHotKeyOption.controlShiftCommandR.displayName)
+        XCTAssertEqual(controller.snapshot.modifierMapping, .default)
+    }
+
+    @MainActor
+    func testGlobalHotKeySelectionPersistsAndReRegisters() async throws {
+        let transport = MockTransport()
+        let keyCapture = MockKeyCapture()
+        let controller = RemoteSessionController(
+            transport: transport,
+            announcer: MockAnnouncer(),
+            clipboard: MockClipboard(),
+            keyCapture: keyCapture,
+            permissionChecker: MockPermissionChecker(isTrusted: true),
+            globalHotKeyManager: MockGlobalHotKeyManager(),
+            settingsStore: MockSettingsStore()
+        )
+
+        controller.setGlobalToggleHotKey(.controlShiftCommandR)
+
+        XCTAssertEqual(controller.snapshot.globalToggleHotKey, .controlShiftCommandR)
+        XCTAssertEqual(controller.snapshot.globalHotKeyDisplay, "F12")
+        XCTAssertEqual(keyCapture.lastKeyboardRouting?.toggleHotKey.displayName, "F12")
+    }
+
+    @MainActor
+    func testControlModeChangesAreAnnouncedViaVoiceOverBridge() async throws {
+        let transport = MockTransport()
+        let announcer = MockAnnouncer()
+        let controller = RemoteSessionController(
+            transport: transport,
+            announcer: announcer,
+            textSpeaker: MockTextSpeaker(),
+            clipboard: MockClipboard(),
+            keyCapture: MockKeyCapture(),
+            permissionChecker: MockPermissionChecker(isTrusted: true),
+            globalHotKeyManager: MockGlobalHotKeyManager(),
+            settingsStore: MockSettingsStore()
+        )
+
+        await controller.connect(using: sampleConfiguration(role: .master))
+        await settle()
+        controller.toggleControl()
+        await settle()
+        controller.toggleControl()
+        await settle()
+
+        XCTAssertTrue(announcer.messages.contains("Controlling remote machine"))
+        XCTAssertTrue(announcer.messages.contains("Controlling local machine"))
+    }
+
+    @MainActor
+    func testCustomModifierMappingPersistsAndUpdatesKeyboardRouting() async throws {
+        let transport = MockTransport()
+        let keyCapture = MockKeyCapture()
+        let mapping = RemoteModifierMapping(rightOption: .rightWindows)
+        let controller = RemoteSessionController(
+            transport: transport,
+            announcer: MockAnnouncer(),
+            clipboard: MockClipboard(),
+            keyCapture: keyCapture,
+            permissionChecker: MockPermissionChecker(isTrusted: true),
+            globalHotKeyManager: MockGlobalHotKeyManager(),
+            settingsStore: MockSettingsStore()
+        )
+
+        controller.setModifierMapping(mapping)
+
+        XCTAssertEqual(controller.snapshot.modifierMapping, mapping)
+        XCTAssertEqual(keyCapture.lastKeyboardRouting?.modifierMapping, mapping)
     }
 
     @MainActor
@@ -306,14 +427,16 @@ final class MacRemoteCoreTests: XCTestCase {
         await controller.connect(using: sampleConfiguration(role: .master))
         await settle()
         controller.toggleControl()
-        keyCapture.emit(.init(vkCode: 0x41, scanCode: 0x1E, pressed: true))
+        keyCapture.emit(.init(vkCode: 0xA2, scanCode: 0x1D, pressed: true))
+        keyCapture.emit(.init(vkCode: 0x43, scanCode: 0x2E, pressed: true))
+        keyCapture.emit(.init(vkCode: 0x43, scanCode: 0x2E, pressed: false))
         await settle()
         controller.toggleControl()
         await settle()
 
         XCTAssertTrue(transport.sentMessages.contains { envelope in
             if case let .key(payload) = envelope.message {
-                return payload.vkCode == 0x41 && payload.pressed == false
+                return payload.vkCode == 0xA2 && payload.pressed == false
             }
             return false
         })
@@ -323,7 +446,7 @@ final class MacRemoteCoreTests: XCTestCase {
         XCTAssertEqual(MacVirtualKeyMapper.windowsVirtualKey(for: 55), 0xA4)
         XCTAssertEqual(MacVirtualKeyMapper.windowsVirtualKey(for: 54), 0xA5)
         XCTAssertEqual(MacVirtualKeyMapper.windowsVirtualKey(for: 58), 0x5B)
-        XCTAssertEqual(MacVirtualKeyMapper.windowsVirtualKey(for: 61), 0x5C)
+        XCTAssertEqual(MacVirtualKeyMapper.windowsVirtualKey(for: 61), 0x5D)
         XCTAssertEqual(MacVirtualKeyMapper.windowsVirtualKey(for: 59), 0xA2)
         XCTAssertEqual(MacVirtualKeyMapper.windowsVirtualKey(for: 62), 0xA3)
     }
@@ -968,6 +1091,7 @@ private final class MockKeyCapture: KeyCaptureManaging {
     private(set) var startCallCount = 0
     private(set) var stopCallCount = 0
     private(set) var startedScopes: [KeyCaptureScope] = []
+    private(set) var lastKeyboardRouting: KeyboardRoutingConfiguration?
     var startResult = true
 
     func start(scope: KeyCaptureScope) -> Bool {
@@ -980,6 +1104,10 @@ private final class MockKeyCapture: KeyCaptureManaging {
         stopCallCount += 1
     }
 
+    func updateKeyboardRouting(_ configuration: KeyboardRoutingConfiguration) {
+        lastKeyboardRouting = configuration
+    }
+
     func emit(_ event: CapturedKeyEvent) {
         onKeyEvent?(event)
     }
@@ -988,7 +1116,7 @@ private final class MockKeyCapture: KeyCaptureManaging {
 @MainActor
 private final class MockGlobalHotKeyManager: GlobalHotKeyManaging {
     var onToggleRequested: (() -> Void)?
-    private(set) var displayName = ToggleHotKey.fixedControlCommandBacktick.displayName
+    private(set) var displayName = GlobalToggleHotKeyOption.controlShiftCommandR.displayName
     private(set) var registerCallCount = 0
     private(set) var unregisterCallCount = 0
     private(set) var registeredHotKeys: [ToggleHotKey] = []
@@ -1059,6 +1187,20 @@ private struct MockAnnouncer: AnnouncementPosting {
 
     final class Storage: @unchecked Sendable {
         var messages: [String] = []
+    }
+}
+
+@MainActor
+private final class MockTextSpeaker: TextSpeaking {
+    private(set) var messages: [String] = []
+    private(set) var stopCallCount = 0
+
+    func speak(_ text: String) {
+        messages.append(text)
+    }
+
+    func stop() {
+        stopCallCount += 1
     }
 }
 

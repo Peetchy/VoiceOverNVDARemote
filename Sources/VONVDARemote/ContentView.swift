@@ -10,19 +10,31 @@ struct ContentView: View {
     @State private var port = "6837"
     @State private var key = "0871234321"
     @State private var captureScope: KeyCaptureScope = .session
+    @State private var globalHotKey: GlobalToggleHotKeyOption = .controlShiftCommandR
+    @State private var speechOutputMode: SpeechOutputMode = .voiceOver
+    @State private var showingEventLog = false
+    @State private var showingKeymapEditor = false
 
     var body: some View {
         HStack(spacing: 20) {
             VStack(alignment: .leading, spacing: 20) {
                 connectionPanel
                 statusPanel
+                toolsPanel
             }
             .frame(maxWidth: 360, maxHeight: .infinity, alignment: .topLeading)
 
             VStack(alignment: .leading, spacing: 20) {
-                peerPanel
-                announcementPanel
-                eventPanel
+                if canShowConnectedDetails {
+                    peerPanel
+                } else {
+                    ContentUnavailableView(
+                        "No Active Session",
+                        systemImage: "rectangle.connected.to.line.below",
+                        description: Text("Connected peers and session details will appear after the remote session is established.")
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
@@ -36,9 +48,22 @@ struct ContentView: View {
         )
         .onAppear {
             captureScope = controller.snapshot.keyCaptureScope
+            globalHotKey = controller.snapshot.globalToggleHotKey
+            speechOutputMode = controller.snapshot.speechOutputMode
         }
         .onChange(of: controller.snapshot.phase) { oldValue, newValue in
             soundPlayer.playTransition(from: oldValue, to: newValue)
+        }
+        .sheet(isPresented: $showingEventLog) {
+            EventLogSheet(records: controller.snapshot.eventLog)
+        }
+        .sheet(isPresented: $showingKeymapEditor) {
+            KeymapEditorSheet(
+                initialMapping: controller.snapshot.modifierMapping,
+                onSave: { mapping in
+                    controller.setModifierMapping(mapping)
+                }
+            )
         }
     }
 
@@ -56,21 +81,49 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Text("Mode: control another machine")
-                    .foregroundStyle(.secondary)
+
                 Text("While controlling, local key events are captured. Press F12 to return control to this Mac.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("Global toggle hotkey: \(controller.snapshot.globalHotKeyDisplay)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Picker("Capture Scope", selection: $captureScope) {
-                    Text("Whole Session").tag(KeyCaptureScope.session)
-                    Text("App Only").tag(KeyCaptureScope.application)
+
+                selectionRow(
+                    title: "Capture Scope",
+                    value: captureScope.displayName
+                ) {
+                    ForEach(KeyCaptureScope.allCases, id: \.self) { scope in
+                        Button(scope.displayName) {
+                            captureScope = scope
+                            controller.setKeyCaptureScope(scope)
+                        }
+                    }
                 }
-                .pickerStyle(.segmented)
-                .onChange(of: captureScope) { _, newValue in
-                    controller.setKeyCaptureScope(newValue)
+
+                selectionRow(
+                    title: "Global Hotkey",
+                    value: globalHotKey.displayName
+                ) {
+                    ForEach(GlobalToggleHotKeyOption.allCases, id: \.self) { option in
+                        Button(option.displayName) {
+                            globalHotKey = option
+                            controller.setGlobalToggleHotKey(option)
+                        }
+                    }
+                }
+
+                selectionRow(
+                    title: "Speech Output",
+                    value: speechOutputMode.displayName
+                ) {
+                    ForEach(SpeechOutputMode.allCases, id: \.self) { mode in
+                        Button(mode.displayName) {
+                            speechOutputMode = mode
+                            controller.setSpeechOutputMode(mode)
+                        }
+                    }
+                }
+
+                Button("Custom Keymap") {
+                    showingKeymapEditor = true
                 }
 
                 if shouldShowAccessibilityWarning {
@@ -102,27 +155,37 @@ struct ContentView: View {
                 .tint(isConnectedLike ? .red : .accentColor)
                 .buttonStyle(.borderedProminent)
 
-                HStack {
-                    Button(controlButtonTitle) {
-                        controller.toggleControl()
-                    }
-                    .disabled(!canToggleControl)
-                    Button("Send F11") {
-                        Task {
-                            await controller.sendRemoteKey(vkCode: 0x7A, scanCode: 0x57, extended: false, pressed: true)
-                            await controller.sendRemoteKey(vkCode: 0x7A, scanCode: 0x57, extended: false, pressed: false)
+                if canShowConnectedActions {
+                    HStack {
+                        Button(controlButtonTitle) {
+                            controller.toggleControl()
                         }
-                    }
-                    .disabled(!canUseConnectedCommands)
-                    Button("Push Clipboard") {
-                        Task {
-                            await controller.pushClipboard()
+                        .disabled(!canToggleControl)
+
+                        Button("Send F11") {
+                            Task {
+                                await controller.sendRemoteKey(vkCode: 0x7A, scanCode: 0x57, extended: false, pressed: true)
+                                await controller.sendRemoteKey(vkCode: 0x7A, scanCode: 0x57, extended: false, pressed: false)
+                            }
                         }
-                    }
-                    .disabled(!canUseConnectedCommands)
-                    Button("Ping") {
-                        Task {
-                            await controller.sendPing()
+                        .disabled(!canUseConnectedCommands)
+
+                        Button("Push Clipboard") {
+                            Task {
+                                await controller.pushClipboard()
+                            }
+                        }
+                        .disabled(!canUseConnectedCommands)
+
+                        Button("Copy Last Text") {
+                            controller.copyLatestTextToClipboard()
+                        }
+                        .disabled(!canCopyLatestText)
+
+                        Button("Ping") {
+                            Task {
+                                await controller.sendPing()
+                            }
                         }
                     }
                 }
@@ -136,21 +199,37 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(phaseLabel)
                     .font(.title3.weight(.semibold))
-                Text("Peers: \(controller.snapshot.peers.count)")
-                Text("Key capture: \(controller.snapshot.keyCaptureActive ? "active" : "inactive")")
-                if controller.snapshot.keyCaptureScope == .application && controller.snapshot.keyCaptureActive {
-                    Text("App-only capture is live. Keep VO NVDA Remote frontmost while sending keys.")
+                if canShowConnectedDetails {
+                    Text("Peers: \(controller.snapshot.peers.count)")
+                    Text("Key capture: \(controller.snapshot.keyCaptureActive ? "active" : "inactive")")
+                    if controller.snapshot.keyCaptureScope == .application && controller.snapshot.keyCaptureActive {
+                        Text("App-only capture is live. Keep VO NVDA Remote frontmost while sending keys.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("Send Ctrl+Alt+Del") {
+                        Task {
+                            await controller.sendCtrlAltDelete()
+                        }
+                    }
+                    .disabled(!canUseConnectedCommands)
+                } else {
+                    Text("Remote actions and session details will appear after the connection is established.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Text("Latest announcement: \(controller.snapshot.latestAnnouncement ?? "None")")
-                    .lineLimit(3)
-                Button("Send Ctrl+Alt+Del") {
-                    Task {
-                        await controller.sendCtrlAltDelete()
-                    }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var toolsPanel: some View {
+        GroupBox("Tools") {
+            VStack(alignment: .leading, spacing: 10) {
+                Button("Event Flow") {
+                    showingEventLog = true
                 }
-                .disabled(!canUseConnectedCommands)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -169,28 +248,25 @@ struct ContentView: View {
         }
     }
 
-    private var announcementPanel: some View {
-        GroupBox("VoiceOver Announcements") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(controller.snapshot.latestAnnouncement ?? "Waiting for remote speech feedback")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                Text("NVDA speech mapped to VoiceOver announcement")
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
-        }
-    }
-
-    private var eventPanel: some View {
-        GroupBox("Event Flow") {
-            List(controller.snapshot.eventLog) { record in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(record.message)
-                    Text(record.timestamp.formatted(date: .omitted, time: .standard))
+    private func selectionRow<MenuContent: View>(
+        title: String,
+        value: String,
+        @ViewBuilder content: () -> MenuContent
+    ) -> some View {
+        HStack {
+            Text(title)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Menu {
+                content()
+            } label: {
+                HStack(spacing: 8) {
+                    Text(value)
+                    Image(systemName: "chevron.up.chevron.down")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
+            .menuStyle(.borderlessButton)
         }
     }
 
@@ -255,7 +331,196 @@ struct ContentView: View {
         isConnectedLike
     }
 
+    private var canCopyLatestText: Bool {
+        canUseConnectedCommands && !(controller.snapshot.latestAnnouncement?.isEmpty ?? true)
+    }
+
+    private var canShowConnectedActions: Bool {
+        isConnectedLike || controller.snapshot.phase == .connecting
+    }
+
+    private var canShowConnectedDetails: Bool {
+        isConnectedLike
+    }
+
     private var shouldShowAccessibilityWarning: Bool {
         captureScope == .session && !controller.snapshot.accessibilityTrusted
+    }
+}
+
+private struct EventLogSheet: View {
+    let records: [RemoteEventRecord]
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if records.isEmpty {
+                    ContentUnavailableView(
+                        "No Events Yet",
+                        systemImage: "timeline.selection",
+                        description: Text("Connection progress and remote activity will appear here.")
+                    )
+                } else {
+                    List(records) { record in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(record.message)
+                            Text(record.timestamp.formatted(date: .omitted, time: .standard))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Event Flow")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .frame(minWidth: 520, minHeight: 360)
+    }
+}
+
+private struct KeymapEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var draftMapping: RemoteModifierMapping
+
+    private let onSave: (RemoteModifierMapping) -> Void
+
+    init(initialMapping: RemoteModifierMapping, onSave: @escaping (RemoteModifierMapping) -> Void) {
+        _draftMapping = State(initialValue: initialMapping)
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(KeymapSlot.allCases) { slot in
+                    HStack {
+                        Text(slot.displayName)
+                        Spacer()
+                        Menu(currentTarget(for: slot).displayName) {
+                            ForEach(RemoteModifierTarget.allCases, id: \.self) { target in
+                                Button(target.displayName) {
+                                    setTarget(target, for: slot)
+                                }
+                            }
+                        }
+                        .menuStyle(.borderlessButton)
+                    }
+                }
+            }
+            .navigationTitle("Custom Keymap")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem {
+                    Button("Reset Default") {
+                        draftMapping = .default
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave(draftMapping)
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .frame(minWidth: 520, minHeight: 420)
+    }
+
+    private func currentTarget(for slot: KeymapSlot) -> RemoteModifierTarget {
+        switch slot {
+        case .leftControl:
+            draftMapping.leftControl
+        case .rightControl:
+            draftMapping.rightControl
+        case .leftOption:
+            draftMapping.leftOption
+        case .rightOption:
+            draftMapping.rightOption
+        case .leftCommand:
+            draftMapping.leftCommand
+        case .rightCommand:
+            draftMapping.rightCommand
+        case .leftShift:
+            draftMapping.leftShift
+        case .rightShift:
+            draftMapping.rightShift
+        }
+    }
+
+    private func setTarget(_ target: RemoteModifierTarget, for slot: KeymapSlot) {
+        switch slot {
+        case .leftControl:
+            draftMapping.leftControl = target
+        case .rightControl:
+            draftMapping.rightControl = target
+        case .leftOption:
+            draftMapping.leftOption = target
+        case .rightOption:
+            draftMapping.rightOption = target
+        case .leftCommand:
+            draftMapping.leftCommand = target
+        case .rightCommand:
+            draftMapping.rightCommand = target
+        case .leftShift:
+            draftMapping.leftShift = target
+        case .rightShift:
+            draftMapping.rightShift = target
+        }
+    }
+}
+
+private enum KeymapSlot: CaseIterable, Identifiable {
+    case leftControl
+    case rightControl
+    case leftOption
+    case rightOption
+    case leftCommand
+    case rightCommand
+    case leftShift
+    case rightShift
+
+    var id: Self { self }
+
+    var displayName: String {
+        switch self {
+        case .leftControl:
+            "Control Left"
+        case .rightControl:
+            "Control Right"
+        case .leftOption:
+            "Option Left"
+        case .rightOption:
+            "Option Right"
+        case .leftCommand:
+            "Command Left"
+        case .rightCommand:
+            "Command Right"
+        case .leftShift:
+            "Shift Left"
+        case .rightShift:
+            "Shift Right"
+        }
+    }
+}
+
+private extension KeyCaptureScope {
+    var displayName: String {
+        switch self {
+        case .application:
+            "App Only"
+        case .session:
+            "Whole Session"
+        }
     }
 }

@@ -9,7 +9,7 @@ on:
       version:
         description: "Release version (example: 0.1.0)"
         required: true
-        default: "0.1.0"
+        default: "0.1.1"
 
 permissions:
   contents: write
@@ -79,10 +79,6 @@ jobs:
         shell: bash
         run: ./scripts/build_dmg.sh
 
-      - name: Create release archive
-        shell: bash
-        run: ditto -c -k --keepParent "dist/${APP_NAME}.app" "dist/VO_NVDA_Remote.zip"
-
       - name: Publish GitHub release
         id: publish
         uses: softprops/action-gh-release@v2
@@ -93,7 +89,18 @@ jobs:
           prerelease: false
           files: |
             dist/VO_NVDA_Remote.dmg
-            dist/VO_NVDA_Remote.zip
+
+      - name: Remove previous releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_TAG: v${{ steps.version.outputs.version }}
+        run: |
+          gh release list --limit 100 --json tagName --jq '.[].tagName' | while read -r tag; do
+            if [[ -n "$tag" && "$tag" != "$CURRENT_TAG" ]]; then
+              gh release delete "$tag" --yes --cleanup-tag || true
+            fi
+          done
 
       - name: Install Sparkle signing dependency
         shell: bash

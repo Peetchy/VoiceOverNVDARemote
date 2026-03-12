@@ -99,7 +99,7 @@ Notes:
 Generate an appcast/update feed scaffold:
 
 ```bash
-export APPCAST_VERSION="0.1.0"
+export APPCAST_VERSION="0.1.1"
 export APPCAST_BUILD="1"
 export APPCAST_URL="https://example.com/VO_NVDA_Remote.dmg"
 export APPCAST_LENGTH="12345678"

@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 @preconcurrency import ApplicationServices
 @preconcurrency import Carbon
 import CoreGraphics
@@ -47,13 +48,308 @@ public struct ToggleHotKey: Codable, Equatable, Hashable, Sendable {
         modifiers: UInt32(controlKey | cmdKey),
         displayName: "Control+Command+`"
     )
+
+    public static let fixedControlShiftCommandR = ToggleHotKey(
+        keyCode: UInt32(kVK_F12),
+        modifiers: 0,
+        displayName: "F12"
+    )
+
+    fileprivate func matches(keyCode: UInt16, modifiers: CGEventFlags) -> Bool {
+        keyCode == self.keyCode && modifiers.intersection(Self.cgComparableFlags) == requiredCGEventFlags
+    }
+
+    fileprivate func matches(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
+        keyCode == self.keyCode && modifiers.intersection(Self.nsComparableFlags) == requiredNSEventFlags
+    }
+
+    private var requiredCGEventFlags: CGEventFlags {
+        var flags: CGEventFlags = []
+        if modifiers & UInt32(controlKey) != 0 {
+            flags.insert(.maskControl)
+        }
+        if modifiers & UInt32(cmdKey) != 0 {
+            flags.insert(.maskCommand)
+        }
+        if modifiers & UInt32(optionKey) != 0 {
+            flags.insert(.maskAlternate)
+        }
+        if modifiers & UInt32(shiftKey) != 0 {
+            flags.insert(.maskShift)
+        }
+        return flags
+    }
+
+    private var requiredNSEventFlags: NSEvent.ModifierFlags {
+        var flags: NSEvent.ModifierFlags = []
+        if modifiers & UInt32(controlKey) != 0 {
+            flags.insert(.control)
+        }
+        if modifiers & UInt32(cmdKey) != 0 {
+            flags.insert(.command)
+        }
+        if modifiers & UInt32(optionKey) != 0 {
+            flags.insert(.option)
+        }
+        if modifiers & UInt32(shiftKey) != 0 {
+            flags.insert(.shift)
+        }
+        return flags
+    }
+
+    private static let cgComparableFlags: CGEventFlags = [.maskControl, .maskCommand, .maskAlternate, .maskShift]
+    private static let nsComparableFlags: NSEvent.ModifierFlags = [.control, .command, .option, .shift]
 }
 
-public struct RemoteAppSettings: Codable, Equatable, Sendable {
-    public var keyCaptureScope: KeyCaptureScope
+public enum GlobalToggleHotKeyOption: String, CaseIterable, Codable, Equatable, Sendable {
+    case controlCommandBacktick
+    case controlShiftCommandR
 
-    public init(keyCaptureScope: KeyCaptureScope = .session) {
+    public var hotKey: ToggleHotKey {
+        switch self {
+        case .controlCommandBacktick:
+            return .fixedControlCommandBacktick
+        case .controlShiftCommandR:
+            return .fixedControlShiftCommandR
+        }
+    }
+
+    public var displayName: String {
+        hotKey.displayName
+    }
+}
+
+public enum RemoteModifierTarget: String, CaseIterable, Codable, Equatable, Sendable {
+    case leftControl
+    case rightControl
+    case leftAlt
+    case rightAlt
+    case leftShift
+    case rightShift
+    case leftWindows
+    case rightWindows
+    case application
+
+    public var displayName: String {
+        switch self {
+        case .leftControl:
+            "Left Ctrl"
+        case .rightControl:
+            "Right Ctrl"
+        case .leftAlt:
+            "Left Alt"
+        case .rightAlt:
+            "Right Alt"
+        case .leftShift:
+            "Left Shift"
+        case .rightShift:
+            "Right Shift"
+        case .leftWindows:
+            "Left Windows"
+        case .rightWindows:
+            "Right Windows"
+        case .application:
+            "Application"
+        }
+    }
+
+    var vkCode: UInt16 {
+        switch self {
+        case .leftControl:
+            0xA2
+        case .rightControl:
+            0xA3
+        case .leftAlt:
+            0xA4
+        case .rightAlt:
+            0xA5
+        case .leftShift:
+            0xA0
+        case .rightShift:
+            0xA1
+        case .leftWindows:
+            0x5B
+        case .rightWindows:
+            0x5C
+        case .application:
+            0x5D
+        }
+    }
+
+    var extended: Bool {
+        MacVirtualKeyMapper.isExtended(vkCode: vkCode)
+    }
+
+    var scanCode: UInt16? {
+        MacVirtualKeyMapper.windowsScanCode(for: vkCode)
+    }
+}
+
+public struct RemoteModifierMapping: Equatable, Sendable {
+    public var leftControl: RemoteModifierTarget
+    public var rightControl: RemoteModifierTarget
+    public var leftOption: RemoteModifierTarget
+    public var rightOption: RemoteModifierTarget
+    public var leftCommand: RemoteModifierTarget
+    public var rightCommand: RemoteModifierTarget
+    public var leftShift: RemoteModifierTarget
+    public var rightShift: RemoteModifierTarget
+
+    public init(
+        leftControl: RemoteModifierTarget = .leftControl,
+        rightControl: RemoteModifierTarget = .rightControl,
+        leftOption: RemoteModifierTarget = .leftWindows,
+        rightOption: RemoteModifierTarget = .application,
+        leftCommand: RemoteModifierTarget = .leftAlt,
+        rightCommand: RemoteModifierTarget = .rightAlt,
+        leftShift: RemoteModifierTarget = .leftShift,
+        rightShift: RemoteModifierTarget = .rightShift
+    ) {
+        self.leftControl = leftControl
+        self.rightControl = rightControl
+        self.leftOption = leftOption
+        self.rightOption = rightOption
+        self.leftCommand = leftCommand
+        self.rightCommand = rightCommand
+        self.leftShift = leftShift
+        self.rightShift = rightShift
+    }
+
+    public static let `default` = RemoteModifierMapping()
+
+    fileprivate func target(for keyCode: CGKeyCode) -> RemoteModifierTarget? {
+        switch keyCode {
+        case 59:
+            return leftControl
+        case 62:
+            return rightControl
+        case 58:
+            return leftOption
+        case 61:
+            return rightOption
+        case 55:
+            return leftCommand
+        case 54:
+            return rightCommand
+        case 56:
+            return leftShift
+        case 60:
+            return rightShift
+        default:
+            return nil
+        }
+    }
+}
+
+extension RemoteModifierMapping: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case leftControl
+        case rightControl
+        case leftOption
+        case rightOption
+        case leftCommand
+        case rightCommand
+        case leftShift
+        case rightShift
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            leftControl: try container.decodeIfPresent(RemoteModifierTarget.self, forKey: .leftControl) ?? .leftControl,
+            rightControl: try container.decodeIfPresent(RemoteModifierTarget.self, forKey: .rightControl) ?? .rightControl,
+            leftOption: try container.decodeIfPresent(RemoteModifierTarget.self, forKey: .leftOption) ?? .leftWindows,
+            rightOption: try container.decodeIfPresent(RemoteModifierTarget.self, forKey: .rightOption) ?? .application,
+            leftCommand: try container.decodeIfPresent(RemoteModifierTarget.self, forKey: .leftCommand) ?? .leftAlt,
+            rightCommand: try container.decodeIfPresent(RemoteModifierTarget.self, forKey: .rightCommand) ?? .rightAlt,
+            leftShift: try container.decodeIfPresent(RemoteModifierTarget.self, forKey: .leftShift) ?? .leftShift,
+            rightShift: try container.decodeIfPresent(RemoteModifierTarget.self, forKey: .rightShift) ?? .rightShift
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(leftControl, forKey: .leftControl)
+        try container.encode(rightControl, forKey: .rightControl)
+        try container.encode(leftOption, forKey: .leftOption)
+        try container.encode(rightOption, forKey: .rightOption)
+        try container.encode(leftCommand, forKey: .leftCommand)
+        try container.encode(rightCommand, forKey: .rightCommand)
+        try container.encode(leftShift, forKey: .leftShift)
+        try container.encode(rightShift, forKey: .rightShift)
+    }
+}
+
+public struct KeyboardRoutingConfiguration: Equatable, Sendable {
+    public var toggleHotKey: ToggleHotKey
+    public var modifierMapping: RemoteModifierMapping
+
+    public init(
+        toggleHotKey: ToggleHotKey = GlobalToggleHotKeyOption.controlShiftCommandR.hotKey,
+        modifierMapping: RemoteModifierMapping = .default
+    ) {
+        self.toggleHotKey = toggleHotKey
+        self.modifierMapping = modifierMapping
+    }
+}
+
+public enum SpeechOutputMode: String, CaseIterable, Codable, Equatable, Sendable {
+    case voiceOver
+    case tts
+
+    public var displayName: String {
+        switch self {
+        case .voiceOver:
+            "VoiceOver"
+        case .tts:
+            "TTS"
+        }
+    }
+}
+
+public struct RemoteAppSettings: Equatable, Sendable {
+    public var keyCaptureScope: KeyCaptureScope
+    public var globalToggleHotKey: GlobalToggleHotKeyOption
+    public var modifierMapping: RemoteModifierMapping
+    public var speechOutputMode: SpeechOutputMode
+
+    public init(
+        keyCaptureScope: KeyCaptureScope = .session,
+        globalToggleHotKey: GlobalToggleHotKeyOption = .controlShiftCommandR,
+        modifierMapping: RemoteModifierMapping = .default,
+        speechOutputMode: SpeechOutputMode = .voiceOver
+    ) {
         self.keyCaptureScope = keyCaptureScope
+        self.globalToggleHotKey = globalToggleHotKey
+        self.modifierMapping = modifierMapping
+        self.speechOutputMode = speechOutputMode
+    }
+}
+
+extension RemoteAppSettings: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case keyCaptureScope
+        case globalToggleHotKey
+        case modifierMapping
+        case speechOutputMode
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            keyCaptureScope: try container.decodeIfPresent(KeyCaptureScope.self, forKey: .keyCaptureScope) ?? .session,
+            globalToggleHotKey: try container.decodeIfPresent(GlobalToggleHotKeyOption.self, forKey: .globalToggleHotKey) ?? .controlShiftCommandR,
+            modifierMapping: try container.decodeIfPresent(RemoteModifierMapping.self, forKey: .modifierMapping) ?? .default,
+            speechOutputMode: try container.decodeIfPresent(SpeechOutputMode.self, forKey: .speechOutputMode) ?? .voiceOver
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(keyCaptureScope, forKey: .keyCaptureScope)
+        try container.encode(globalToggleHotKey, forKey: .globalToggleHotKey)
+        try container.encode(modifierMapping, forKey: .modifierMapping)
+        try container.encode(speechOutputMode, forKey: .speechOutputMode)
     }
 }
 
@@ -76,7 +372,10 @@ public struct RemoteSessionSnapshot: Equatable, Sendable {
     public var accessibilityTrusted: Bool
     public var keyCaptureActive: Bool
     public var keyCaptureScope: KeyCaptureScope
+    public var globalToggleHotKey: GlobalToggleHotKeyOption
     public var globalHotKeyDisplay: String
+    public var modifierMapping: RemoteModifierMapping
+    public var speechOutputMode: SpeechOutputMode
     public var eventLog: [RemoteEventRecord]
 
     public init(
@@ -86,7 +385,10 @@ public struct RemoteSessionSnapshot: Equatable, Sendable {
         accessibilityTrusted: Bool = false,
         keyCaptureActive: Bool = false,
         keyCaptureScope: KeyCaptureScope = .session,
-        globalHotKeyDisplay: String = "Control+Command+`",
+        globalToggleHotKey: GlobalToggleHotKeyOption = .controlShiftCommandR,
+        globalHotKeyDisplay: String = "F12",
+        modifierMapping: RemoteModifierMapping = .default,
+        speechOutputMode: SpeechOutputMode = .voiceOver,
         eventLog: [RemoteEventRecord] = []
     ) {
         self.phase = phase
@@ -95,7 +397,10 @@ public struct RemoteSessionSnapshot: Equatable, Sendable {
         self.accessibilityTrusted = accessibilityTrusted
         self.keyCaptureActive = keyCaptureActive
         self.keyCaptureScope = keyCaptureScope
+        self.globalToggleHotKey = globalToggleHotKey
         self.globalHotKeyDisplay = globalHotKeyDisplay
+        self.modifierMapping = modifierMapping
+        self.speechOutputMode = speechOutputMode
         self.eventLog = eventLog
     }
 }
@@ -116,6 +421,12 @@ public protocol RemoteTransporting: AnyObject, Sendable {
 
 public protocol AnnouncementPosting: Sendable {
     func post(_ text: String)
+}
+
+@MainActor
+public protocol TextSpeaking: AnyObject {
+    func speak(_ text: String)
+    func stop()
 }
 
 public protocol ClipboardManaging: Sendable {
@@ -149,6 +460,7 @@ public protocol KeyCaptureManaging: AnyObject {
     var onKeyEvent: ((CapturedKeyEvent) -> Void)? { get set }
     func start(scope: KeyCaptureScope) -> Bool
     func stop()
+    func updateKeyboardRouting(_ configuration: KeyboardRoutingConfiguration)
 }
 
 @MainActor
@@ -188,6 +500,23 @@ public struct VoiceOverAnnouncementBridge: AnnouncementPosting {
     }
 }
 
+@MainActor
+public final class SystemTextSpeaker: TextSpeaking {
+    private let synthesizer = AVSpeechSynthesizer()
+
+    public init() {}
+
+    public func speak(_ text: String) {
+        synthesizer.stopSpeaking(at: .immediate)
+        let utterance = AVSpeechUtterance(string: text)
+        synthesizer.speak(utterance)
+    }
+
+    public func stop() {
+        synthesizer.stopSpeaking(at: .immediate)
+    }
+}
+
 public struct SystemClipboardManager: ClipboardManaging {
     public init() {}
 
@@ -210,6 +539,7 @@ public final class EventTapKeyCapture: KeyCaptureManaging {
     private var localMonitor: Any?
     private var modifierState: [CGKeyCode: Bool] = [:]
     private var localModifierState: [UInt16: Bool] = [:]
+    private var keyboardRouting = KeyboardRoutingConfiguration()
 
     public init() {}
 
@@ -281,6 +611,10 @@ public final class EventTapKeyCapture: KeyCaptureManaging {
         localModifierState.removeAll(keepingCapacity: false)
     }
 
+    public func updateKeyboardRouting(_ configuration: KeyboardRoutingConfiguration) {
+        keyboardRouting = configuration
+    }
+
     private func handle(event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let eventTap {
@@ -297,8 +631,8 @@ public final class EventTapKeyCapture: KeyCaptureManaging {
 
     private func makeCapturedEvent(from event: CGEvent, type: CGEventType) -> CapturedKeyEvent? {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        let isToggleHotKey = matchesToggleHotKey(keyCode: UInt16(keyCode), modifiers: event.flags)
-        guard let mappedKey = MacVirtualKeyMapper.windowsVirtualKey(for: CGKeyCode(keyCode)) else {
+        let isToggleHotKey = keyboardRouting.toggleHotKey.matches(keyCode: UInt16(keyCode), modifiers: event.flags)
+        guard let mappedKey = MacVirtualKeyMapper.windowsVirtualKey(for: CGKeyCode(keyCode), modifierMapping: keyboardRouting.modifierMapping) else {
             return nil
         }
         switch type {
@@ -318,8 +652,8 @@ public final class EventTapKeyCapture: KeyCaptureManaging {
     }
 
     private func makeCapturedEvent(from event: NSEvent) -> CapturedKeyEvent? {
-        let isToggleHotKey = matchesToggleHotKey(keyCode: event.keyCode, modifiers: event.modifierFlags)
-        guard let mappedKey = MacVirtualKeyMapper.windowsVirtualKey(for: CGKeyCode(event.keyCode)) else {
+        let isToggleHotKey = keyboardRouting.toggleHotKey.matches(keyCode: event.keyCode, modifiers: event.modifierFlags)
+        guard let mappedKey = MacVirtualKeyMapper.windowsVirtualKey(for: CGKeyCode(event.keyCode), modifierMapping: keyboardRouting.modifierMapping) else {
             return nil
         }
         switch event.type {
@@ -336,19 +670,6 @@ public final class EventTapKeyCapture: KeyCaptureManaging {
         default:
             return nil
         }
-    }
-
-    private func matchesToggleHotKey(keyCode: UInt16, modifiers: CGEventFlags) -> Bool {
-        keyCode == UInt16(kVK_ANSI_Grave)
-            && modifiers.contains(.maskControl)
-            && modifiers.contains(.maskCommand)
-            && !modifiers.contains(.maskAlternate)
-            && !modifiers.contains(.maskShift)
-    }
-
-    private func matchesToggleHotKey(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
-        let filtered = modifiers.intersection([.control, .command, .option, .shift])
-        return keyCode == UInt16(kVK_ANSI_Grave) && filtered == [.control, .command]
     }
 }
 
@@ -372,7 +693,7 @@ public final class AccessibilityPermissionManager: AccessibilityPermissionChecki
 @MainActor
 public final class CarbonGlobalHotKeyManager: GlobalHotKeyManaging {
     public var onToggleRequested: (() -> Void)?
-    public private(set) var displayName = ToggleHotKey.fixedControlCommandBacktick.displayName
+    public private(set) var displayName = GlobalToggleHotKeyOption.controlShiftCommandR.displayName
 
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
@@ -443,7 +764,7 @@ public final class UserDefaultsRemoteSettingsStore: RemoteSettingsStoring, @unch
 }
 
 enum MacVirtualKeyMapper {
-    private static let mapping: [CGKeyCode: UInt16] = [
+    private static let nonModifierMapping: [CGKeyCode: UInt16] = [
         0: 0x41, 1: 0x53, 2: 0x44, 3: 0x46, 4: 0x48, 5: 0x47,
         6: 0x5A, 7: 0x58, 8: 0x43, 9: 0x56, 11: 0x42, 12: 0x51,
         13: 0x57, 14: 0x45, 15: 0x52, 16: 0x59, 17: 0x54, 18: 0x31,
@@ -452,8 +773,7 @@ enum MacVirtualKeyMapper {
         31: 0x4F, 32: 0x55, 33: 0xDB, 34: 0x49, 35: 0x50, 36: 0x0D, 37: 0x4C,
         38: 0x4A, 39: 0xDE, 40: 0x4B, 41: 0xBA, 42: 0xDC, 43: 0xBC,
         44: 0xBF, 45: 0x4E, 46: 0x4D, 47: 0xBE, 48: 0x09, 49: 0x20, 50: 0xC0,
-        51: 0x08, 53: 0x1B, 54: 0xA5, 55: 0xA4, 56: 0xA0, 57: 0x14, 58: 0x5B,
-        59: 0xA2, 60: 0xA1, 61: 0x5C, 62: 0xA3, 65: 0x6E,
+        51: 0x08, 53: 0x1B, 57: 0x14, 65: 0x6E,
         67: 0x6A, 69: 0x6B, 71: 0x90, 75: 0x6F, 76: 0x0D, 78: 0x6D,
         79: 0x7C, 80: 0x7D, 81: 0x6C, 82: 0x60, 83: 0x61, 84: 0x62, 85: 0x63, 86: 0x64,
         87: 0x65, 88: 0x66, 89: 0x67, 91: 0x68, 92: 0x69, 96: 0x74,
@@ -472,7 +792,7 @@ enum MacVirtualKeyMapper {
         0x46: 0x21, 0x47: 0x22, 0x48: 0x23, 0x49: 0x17, 0x4A: 0x24, 0x4B: 0x25,
         0x4C: 0x26, 0x4D: 0x32, 0x4E: 0x31, 0x4F: 0x18, 0x50: 0x19, 0x51: 0x10,
         0x52: 0x13, 0x53: 0x1F, 0x54: 0x14, 0x55: 0x16, 0x56: 0x2F, 0x57: 0x11,
-        0x58: 0x2D, 0x59: 0x15, 0x5A: 0x2C, 0x5B: 0x5B, 0x5C: 0x5C,
+        0x58: 0x2D, 0x59: 0x15, 0x5A: 0x2C, 0x5B: 0x5B, 0x5C: 0x5C, 0x5D: 0x5D,
         0x60: 0x52, 0x61: 0x4F, 0x62: 0x50, 0x63: 0x51, 0x64: 0x4B, 0x65: 0x4C,
         0x66: 0x4D, 0x67: 0x47, 0x68: 0x48, 0x69: 0x49, 0x6A: 0x37, 0x6B: 0x4E,
         0x6C: 0x1C, 0x6D: 0x4A, 0x6E: 0x53, 0x6F: 0x35,
@@ -483,8 +803,11 @@ enum MacVirtualKeyMapper {
         0xC0: 0x29, 0xDB: 0x1A, 0xDC: 0x2B, 0xDD: 0x1B, 0xDE: 0x28
     ]
 
-    static func windowsVirtualKey(for keyCode: CGKeyCode) -> UInt16? {
-        mapping[keyCode]
+    static func windowsVirtualKey(for keyCode: CGKeyCode, modifierMapping: RemoteModifierMapping = .default) -> UInt16? {
+        if let modifierTarget = modifierMapping.target(for: keyCode) {
+            return modifierTarget.vkCode
+        }
+        return nonModifierMapping[keyCode]
     }
 
     static func windowsScanCode(for vkCode: UInt16) -> UInt16? {
@@ -527,7 +850,7 @@ enum MacVirtualKeyMapper {
 
     static func isExtended(vkCode: UInt16) -> Bool {
         switch vkCode {
-        case 0x5C, 0xA3, 0xA5, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E, 0x6F:
+        case 0x5C, 0x5D, 0xA3, 0xA5, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E, 0x6F:
             return true
         default:
             return false
@@ -638,6 +961,7 @@ public final class RemoteSessionController: ObservableObject {
 
     private let transport: RemoteTransporting
     private let announcer: AnnouncementPosting
+    private let textSpeaker: TextSpeaking
     private let clipboard: ClipboardManaging
     private let keyCapture: KeyCaptureManaging
     private let permissionChecker: AccessibilityPermissionChecking
@@ -646,14 +970,16 @@ public final class RemoteSessionController: ObservableObject {
     private var settings: RemoteAppSettings
     private let stopControlKey: UInt16 = 0x7B
     private var activeRemoteKeys: Set<ActiveRemoteKey> = []
-    private var pendingModifierEvents: [CapturedKeyEvent] = []
-    private var autoReleaseModifierKeys: Set<ActiveRemoteKey> = []
+    private var bufferedChordEvents: [ActiveRemoteKey: CapturedKeyEvent] = [:]
+    private var bufferedChordOrder: [ActiveRemoteKey] = []
+    private var suppressedPhysicalKeyUps: Set<ActiveRemoteKey> = []
     private var queuedCapturedEvents: [CapturedKeyEvent] = []
     private var isProcessingCapturedEvents = false
 
     public init(
         transport: RemoteTransporting,
         announcer: AnnouncementPosting = VoiceOverAnnouncementBridge(),
+        textSpeaker: TextSpeaking = SystemTextSpeaker(),
         clipboard: ClipboardManaging = SystemClipboardManager(),
         keyCapture: KeyCaptureManaging = EventTapKeyCapture(),
         permissionChecker: AccessibilityPermissionChecking = AccessibilityPermissionManager(),
@@ -662,6 +988,7 @@ public final class RemoteSessionController: ObservableObject {
     ) {
         self.transport = transport
         self.announcer = announcer
+        self.textSpeaker = textSpeaker
         self.clipboard = clipboard
         self.keyCapture = keyCapture
         self.permissionChecker = permissionChecker
@@ -670,7 +997,10 @@ public final class RemoteSessionController: ObservableObject {
         self.settings = settingsStore.load()
         self.snapshot.accessibilityTrusted = permissionChecker.isTrusted(prompt: false)
         self.snapshot.keyCaptureScope = self.settings.keyCaptureScope
-        self.snapshot.globalHotKeyDisplay = ToggleHotKey.fixedControlCommandBacktick.displayName
+        self.snapshot.globalToggleHotKey = self.settings.globalToggleHotKey
+        self.snapshot.globalHotKeyDisplay = self.settings.globalToggleHotKey.displayName
+        self.snapshot.modifierMapping = self.settings.modifierMapping
+        self.snapshot.speechOutputMode = self.settings.speechOutputMode
         transport.onEvent = { [weak self] event in
             Task { @MainActor in
                 self?.handle(event: event)
@@ -682,7 +1012,12 @@ public final class RemoteSessionController: ObservableObject {
         globalHotKeyManager.onToggleRequested = { [weak self] in
             self?.toggleControl()
         }
-        globalHotKeyManager.register(hotKey: .fixedControlCommandBacktick)
+        let keyboardRouting = KeyboardRoutingConfiguration(
+            toggleHotKey: self.settings.globalToggleHotKey.hotKey,
+            modifierMapping: self.settings.modifierMapping
+        )
+        keyCapture.updateKeyboardRouting(keyboardRouting)
+        globalHotKeyManager.register(hotKey: self.settings.globalToggleHotKey.hotKey)
     }
 
     public func refreshAccessibilityPermission(prompt: Bool = false) {
@@ -700,6 +1035,38 @@ public final class RemoteSessionController: ObservableObject {
         settingsStore.save(settings)
         snapshot.keyCaptureScope = scope
         appendEvent("Key capture scope set to \(scope.rawValue)")
+    }
+
+    public func setGlobalToggleHotKey(_ option: GlobalToggleHotKeyOption) {
+        settings.globalToggleHotKey = option
+        settingsStore.save(settings)
+        snapshot.globalToggleHotKey = option
+        snapshot.globalHotKeyDisplay = option.displayName
+        keyCapture.updateKeyboardRouting(
+            .init(toggleHotKey: option.hotKey, modifierMapping: settings.modifierMapping)
+        )
+        globalHotKeyManager.register(hotKey: option.hotKey)
+        appendEvent("Global hotkey set to \(option.displayName)")
+    }
+
+    public func setModifierMapping(_ mapping: RemoteModifierMapping) {
+        settings.modifierMapping = mapping
+        settingsStore.save(settings)
+        snapshot.modifierMapping = mapping
+        keyCapture.updateKeyboardRouting(
+            .init(toggleHotKey: settings.globalToggleHotKey.hotKey, modifierMapping: mapping)
+        )
+        appendEvent("Custom keymap updated")
+    }
+
+    public func setSpeechOutputMode(_ mode: SpeechOutputMode) {
+        settings.speechOutputMode = mode
+        settingsStore.save(settings)
+        snapshot.speechOutputMode = mode
+        if mode == .voiceOver {
+            textSpeaker.stop()
+        }
+        appendEvent("Speech output set to \(mode.displayName)")
     }
 
     public func connect(host: String, port: UInt16 = 6837, key: String) async {
@@ -720,8 +1087,9 @@ public final class RemoteSessionController: ObservableObject {
 
     public func disconnect() async {
         stopControllingLocally(reason: nil)
-        pendingModifierEvents.removeAll(keepingCapacity: false)
-        autoReleaseModifierKeys.removeAll(keepingCapacity: false)
+        bufferedChordEvents.removeAll(keepingCapacity: false)
+        bufferedChordOrder.removeAll(keepingCapacity: false)
+        suppressedPhysicalKeyUps.removeAll(keepingCapacity: false)
         queuedCapturedEvents.removeAll(keepingCapacity: false)
         await releaseActiveRemoteKeys()
         await transport.disconnect()
@@ -751,11 +1119,13 @@ public final class RemoteSessionController: ObservableObject {
                 appendEvent("Unable to start key capture")
                 return
             }
+            announceControlState("Controlling remote machine")
             appendEvent("Controlling remote machine")
         case .controlling:
             stopControllingLocally(reason: "Controlling local machine")
-            pendingModifierEvents.removeAll(keepingCapacity: false)
-            autoReleaseModifierKeys.removeAll(keepingCapacity: false)
+            bufferedChordEvents.removeAll(keepingCapacity: false)
+            bufferedChordOrder.removeAll(keepingCapacity: false)
+            suppressedPhysicalKeyUps.removeAll(keepingCapacity: false)
             Task {
                 await releaseActiveRemoteKeys()
             }
@@ -775,6 +1145,15 @@ public final class RemoteSessionController: ObservableObject {
         } catch {
             appendEvent("Clipboard push failed: \(error.localizedDescription)")
         }
+    }
+
+    public func copyLatestTextToClipboard() {
+        guard let text = snapshot.latestAnnouncement, !text.isEmpty else {
+            appendEvent("No latest text to copy")
+            return
+        }
+        clipboard.setString(text)
+        appendEvent("Latest text copied to clipboard")
     }
 
     public func sendKey(vkCode: UInt16, scanCode: UInt16? = nil, extended: Bool = false, pressed: Bool = true) async {
@@ -868,11 +1247,12 @@ public final class RemoteSessionController: ObservableObject {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             if !text.isEmpty {
                 snapshot.latestAnnouncement = text
-                announcer.post(text)
+                deliverSpeechOutput(text)
                 appendEvent("Speech: \(text)")
             }
         case .cancel:
             snapshot.latestAnnouncement = nil
+            textSpeaker.stop()
             appendEvent("Speech cancelled")
         case let .pauseSpeech(isPaused):
             appendEvent(isPaused ? "Remote speech paused" : "Remote speech resumed")
@@ -930,30 +1310,30 @@ public final class RemoteSessionController: ObservableObject {
         guard case .controlling = snapshot.phase else { return }
         if event.isToggleHotKey, event.pressed {
             stopControllingLocally(reason: "Controlling local machine")
-            pendingModifierEvents.removeAll(keepingCapacity: false)
-            autoReleaseModifierKeys.removeAll(keepingCapacity: false)
+            bufferedChordEvents.removeAll(keepingCapacity: false)
+            bufferedChordOrder.removeAll(keepingCapacity: false)
+            suppressedPhysicalKeyUps.removeAll(keepingCapacity: false)
             await releaseActiveRemoteKeys()
             return
         }
         if event.vkCode == stopControlKey, event.pressed {
             stopControllingLocally(reason: "Controlling local machine")
-            pendingModifierEvents.removeAll(keepingCapacity: false)
-            autoReleaseModifierKeys.removeAll(keepingCapacity: false)
+            bufferedChordEvents.removeAll(keepingCapacity: false)
+            bufferedChordOrder.removeAll(keepingCapacity: false)
+            suppressedPhysicalKeyUps.removeAll(keepingCapacity: false)
             await releaseActiveRemoteKeys()
             return
         }
-        if isBufferedModifier(event.vkCode) {
-            await handleBufferedModifierEvent(event)
+        let key = ActiveRemoteKey(vkCode: event.vkCode, extended: event.extended)
+        if suppressedPhysicalKeyUps.contains(key), !event.pressed {
+            suppressedPhysicalKeyUps.remove(key)
             return
         }
         if event.pressed {
-            await flushPendingModifierEvents()
+            bufferCapturedKeyDown(event)
+            return
         }
-        appendEvent("Captured key \(event.vkCode) \(event.pressed ? "down" : "up")")
-        await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: event.pressed)
-        if !event.pressed {
-            await releaseAutoReleaseModifiers()
-        }
+        await handleCapturedKeyUp(event)
     }
 
     private func trackRemoteKeyState(vkCode: UInt16, extended: Bool, pressed: Bool) {
@@ -970,6 +1350,7 @@ public final class RemoteSessionController: ObservableObject {
         snapshot.keyCaptureActive = false
         if case .controlling = snapshot.phase {
             snapshot.phase = .connected
+            announceControlState("Controlling local machine")
         }
         if let reason {
             appendEvent(reason)
@@ -989,64 +1370,97 @@ public final class RemoteSessionController: ObservableObject {
         }
     }
 
-    private func handleBufferedModifierEvent(_ event: CapturedKeyEvent) async {
+    private func bufferCapturedKeyDown(_ event: CapturedKeyEvent) {
         let key = ActiveRemoteKey(vkCode: event.vkCode, extended: event.extended)
-        if event.pressed {
-            if !pendingModifierEvents.contains(where: { $0.vkCode == event.vkCode && $0.extended == event.extended }) &&
-                !activeRemoteKeys.contains(key) {
-                pendingModifierEvents.append(event)
-                if shouldAutoReleaseModifier(event.vkCode) {
-                    autoReleaseModifierKeys.insert(key)
-                }
-            }
-            return
-        }
-        if let index = pendingModifierEvents.firstIndex(where: { $0.vkCode == event.vkCode && $0.extended == event.extended }) {
-            let pending = pendingModifierEvents.remove(at: index)
-            autoReleaseModifierKeys.remove(key)
-            appendEvent("Captured key \(pending.vkCode) down")
-            await sendRemoteKey(vkCode: pending.vkCode, scanCode: pending.scanCode, extended: pending.extended, pressed: true)
+        guard !activeRemoteKeys.contains(key), bufferedChordEvents[key] == nil else { return }
+        bufferedChordEvents[key] = event
+        bufferedChordOrder.append(key)
+    }
+
+    private func handleCapturedKeyUp(_ event: CapturedKeyEvent) async {
+        let key = ActiveRemoteKey(vkCode: event.vkCode, extended: event.extended)
+        if activeRemoteKeys.contains(key) {
             appendEvent("Captured key \(event.vkCode) up")
             await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: false)
             return
         }
-        if !activeRemoteKeys.contains(key) {
-            autoReleaseModifierKeys.remove(key)
+
+        let bufferedEvents = bufferedChordOrder.compactMap { bufferedChordEvents[$0] }
+        guard !bufferedEvents.isEmpty else { return }
+
+        if !isChordModifier(event.vkCode) || bufferedEvents.contains(where: { !isChordModifier($0.vkCode) }) {
+            await flushBufferedChord(triggeringRelease: event, bufferedEvents: bufferedEvents)
             return
         }
+
+        removeBufferedChordKey(key)
+        appendEvent("Captured key \(event.vkCode) down")
+        await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: true)
         appendEvent("Captured key \(event.vkCode) up")
         await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: false)
     }
 
-    private func flushPendingModifierEvents() async {
-        let pending = pendingModifierEvents
-        pendingModifierEvents.removeAll(keepingCapacity: true)
-        for event in pending {
-            appendEvent("Captured key \(event.vkCode) down")
-            await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: true)
+    private func flushBufferedChord(triggeringRelease event: CapturedKeyEvent, bufferedEvents: [CapturedKeyEvent]) async {
+        let triggeringKey = ActiveRemoteKey(vkCode: event.vkCode, extended: event.extended)
+        bufferedChordEvents.removeAll(keepingCapacity: true)
+        bufferedChordOrder.removeAll(keepingCapacity: true)
+
+        for bufferedEvent in bufferedEvents {
+            appendEvent("Captured key \(bufferedEvent.vkCode) down")
+            await sendRemoteKey(
+                vkCode: bufferedEvent.vkCode,
+                scanCode: bufferedEvent.scanCode,
+                extended: bufferedEvent.extended,
+                pressed: true
+            )
+        }
+
+        appendEvent("Captured key \(event.vkCode) up")
+        await sendRemoteKey(vkCode: event.vkCode, scanCode: event.scanCode, extended: event.extended, pressed: false)
+
+        for bufferedEvent in bufferedEvents.reversed() {
+            let key = ActiveRemoteKey(vkCode: bufferedEvent.vkCode, extended: bufferedEvent.extended)
+            guard key != triggeringKey, shouldAutoReleaseModifier(bufferedEvent.vkCode), activeRemoteKeys.contains(key) else { continue }
+            suppressedPhysicalKeyUps.insert(key)
+            appendEvent("Captured key \(bufferedEvent.vkCode) up")
+            await sendRemoteKey(
+                vkCode: bufferedEvent.vkCode,
+                scanCode: bufferedEvent.scanCode ?? MacVirtualKeyMapper.windowsScanCode(for: bufferedEvent.vkCode),
+                extended: bufferedEvent.extended,
+                pressed: false
+            )
         }
     }
 
-    private func releaseAutoReleaseModifiers() async {
-        let keysToRelease = autoReleaseModifierKeys.filter { activeRemoteKeys.contains($0) }
-        autoReleaseModifierKeys.subtract(keysToRelease)
-        for key in keysToRelease {
-            appendEvent("Captured key \(key.vkCode) up")
-            await sendRemoteKey(vkCode: key.vkCode, scanCode: MacVirtualKeyMapper.windowsScanCode(for: key.vkCode), extended: key.extended, pressed: false)
-        }
+    private func removeBufferedChordKey(_ key: ActiveRemoteKey) {
+        bufferedChordEvents.removeValue(forKey: key)
+        bufferedChordOrder.removeAll { $0 == key }
     }
 
     private func shouldAutoReleaseModifier(_ vkCode: UInt16) -> Bool {
         vkCode == 0x14
     }
 
-    private func isBufferedModifier(_ vkCode: UInt16) -> Bool {
+    private func isChordModifier(_ vkCode: UInt16) -> Bool {
         switch vkCode {
         case 0x14, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C:
             return true
         default:
             return false
         }
+    }
+
+    private func deliverSpeechOutput(_ text: String) {
+        switch snapshot.speechOutputMode {
+        case .voiceOver:
+            announcer.post(text)
+        case .tts:
+            textSpeaker.speak(text)
+        }
+    }
+
+    private func announceControlState(_ text: String) {
+        announcer.post(text)
     }
 
     private func prepareApplicationCaptureEnvironment() {

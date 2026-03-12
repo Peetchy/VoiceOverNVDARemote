@@ -9,8 +9,47 @@ This project is designed for VoiceOver users on macOS who need to connect to an 
 - Connects to `nvdaremote.com` over raw TLS using NVDA Remote protocol v2
 - Supports master-only mode
 - Supports keyboard forwarding, clipboard push, and VoiceOver announcement mapping from remote speech
+- Supports configurable global toggle hotkeys
+- Supports custom left/right modifier remapping for remote key input
 - Publishes public GitHub release assets and appcast feed
 - Supports app-only and whole-session key capture modes
+
+## How to use
+
+1. Launch the app.
+2. Enter the relay `Host`, `Port`, and `Session Key`.
+3. Press `Connect`.
+4. After the session is connected, press `Start Control` to begin sending keyboard input to the Windows machine.
+5. Press `F12` to stop controlling and return the keyboard to the Mac.
+
+Before the session connects, the app intentionally hides controls and details that only apply to an active remote session.
+
+## Main window
+
+The connection panel currently includes:
+
+- `Host`, `Port`, and `Session Key`
+- `Connect` / `Disconnect`
+- `Capture Scope`
+- `Global Hotkey`
+- `Speech Output`
+- `Custom Keymap`
+
+After connecting, the host and port are still shown, but the session key is hidden.
+
+Remote-only controls that appear after connection:
+
+- `Start Control` / `Stop Control`
+- `Send F11`
+- `Push Clipboard`
+- `Copy Last Text`
+- `Ping`
+- `Send Ctrl+Alt+Del`
+
+Session-only detail panels that appear after connection:
+
+- `Connected Peers`
+- live session details in `Session State`
 
 ## Project structure
 
@@ -86,19 +125,87 @@ swift run KeyCaptureProbe
 - `Whole Session`: captures keys globally with an event tap and requires Accessibility permission
 - `App Only`: captures keys only while the app window is active and does not require Accessibility permission
 
+If `Whole Session` is selected and Accessibility access is missing, the app exposes controls to refresh permission state or open the relevant macOS settings page.
+
 Default stop-control key:
 
 - `F12`
 
-Global toggle hotkey:
+## Global toggle hotkey
 
-- fixed to `Control+Command+\``
+The toggle hotkey is configurable from the main window. Current options:
 
-Modifier mapping while controlling:
+- `Control+Command+\``
+- `F12`
 
-- `Command` maps to Windows `Alt`
-- `Option` maps to the Windows key
-- `Control` maps to Windows `Control`
+This hotkey toggles remote control mode while the app is running.
+Default selection: `F12`.
+
+## Speech output
+
+Remote speech output can be routed to either:
+
+- `VoiceOver`
+- `TTS`
+
+This setting changes how incoming NVDA speech is presented on macOS, without changing the relay protocol itself.
+
+For the best experience with `VoiceOver` output, allow VoiceOver to be controlled by scripts in VoiceOver Utility so the app can reliably interact with VoiceOver during use.
+
+## Custom keymap
+
+The `Custom Keymap` button opens a sheet for configuring how Mac modifier keys are sent to the remote Windows machine.
+
+Configurable source keys:
+
+- `Control Left`
+- `Control Right`
+- `Option Left`
+- `Option Right`
+- `Command Left`
+- `Command Right`
+- `Shift Left`
+- `Shift Right`
+
+Available target keys:
+
+- `Left Ctrl`
+- `Right Ctrl`
+- `Left Alt`
+- `Right Alt`
+- `Left Shift`
+- `Right Shift`
+- `Left Windows`
+- `Right Windows`
+- `Application`
+
+Default mapping:
+
+- `Control Left` -> `Left Ctrl`
+- `Control Right` -> `Right Ctrl`
+- `Option Left` -> `Left Windows`
+- `Option Right` -> `Application`
+- `Command Left` -> `Left Alt`
+- `Command Right` -> `Right Alt`
+- `Shift Left` -> `Left Shift`
+- `Shift Right` -> `Right Shift`
+
+## Event flow
+
+The app keeps an internal event log for:
+
+- connection progress
+- relay transport events
+- remote speech and announcement updates
+- clipboard activity
+- captured and forwarded key activity
+
+The `Event Flow` button in the `Tools` section opens this log in a separate sheet instead of showing it in the main window by default.
+
+## Notes
+
+- When control switches between the local Mac and the remote Windows machine, VoiceOver announces the mode change.
+- `Copy Last Text` copies the most recent remote speech text received by the app to the clipboard.
 
 ## Packaging
 
@@ -107,6 +214,8 @@ Build a release app bundle:
 ```bash
 ./scripts/build_app.sh
 ```
+
+This script produces an ad-hoc signed `.app` bundle using `codesign --sign -`.
 
 Build a DMG:
 
@@ -125,7 +234,8 @@ The repository includes a GitHub Actions workflow that:
 
 - builds the app on tag push
 - creates a public GitHub Release
-- uploads `VO_NVDA_Remote.dmg` and `VO_NVDA_Remote.zip`
+- uploads `VO_NVDA_Remote.dmg`
+- deletes older GitHub releases and their tags after publishing the current one
 - generates `appcast.xml`
 - publishes the appcast to `gh-pages`
 
@@ -136,8 +246,8 @@ Release workflow file:
 Release trigger:
 
 ```bash
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 ## Public URLs

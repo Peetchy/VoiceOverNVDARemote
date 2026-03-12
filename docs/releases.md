@@ -5,16 +5,16 @@
 This repository is configured to publish public release assets through GitHub Releases:
 
 - `VO_NVDA_Remote.dmg`
-- `VO_NVDA_Remote.zip`
 - `appcast.xml` on GitHub Pages
+- older GitHub releases are removed when a new release is published
 
 ## Triggering a release
 
 Push a tag like:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 Or run the `Release` workflow manually from GitHub Actions using `workflow_dispatch`.
