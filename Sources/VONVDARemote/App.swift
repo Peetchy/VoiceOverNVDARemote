@@ -4,12 +4,9 @@ import SwiftUI
 
 @main
 struct VONVDARemoteApp: App {
-    @StateObject private var controller = RemoteSessionController(
-        transport: NVDAProtocolTransport(),
-        soundPlayer: SystemRemoteSoundPlayer(
-            soundDirectories: SystemRemoteSoundPlayer.bundledSoundDirectories + [developmentSoundDirectory]
-        )
-    )
+    // Built in a helper: Swift 6.1 crashes in SILGen when the StateObject
+    // autoclosure itself contains the nested sound player construction.
+    @StateObject private var controller = makeRemoteSessionController()
     @StateObject private var sparkleController = SparkleController()
 
     var body: some Scene {
@@ -31,3 +28,11 @@ struct VONVDARemoteApp: App {
 private let developmentSoundDirectory = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent()
     .appendingPathComponent("Sounds", isDirectory: true)
+
+@MainActor
+private func makeRemoteSessionController() -> RemoteSessionController {
+    var soundDirectories = SystemRemoteSoundPlayer.bundledSoundDirectories
+    soundDirectories.append(developmentSoundDirectory)
+    let soundPlayer = SystemRemoteSoundPlayer(soundDirectories: soundDirectories)
+    return RemoteSessionController(transport: NVDAProtocolTransport(), soundPlayer: soundPlayer)
+}
