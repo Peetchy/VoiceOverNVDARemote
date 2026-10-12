@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 APP_NAME="VO NVDA Remote"
 EXECUTABLE_NAME="VONVDARemote"
-APP_VERSION="${APP_VERSION:-0.1.1}"
+APP_VERSION="${APP_VERSION:-1.0.1}"
 APP_BUILD="${APP_BUILD:-1}"
 APPCAST_URL="${APPCAST_URL:-}"
 SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-}"
@@ -23,6 +23,10 @@ mkdir -p "$MACOS_DIR"
 mkdir -p "$FRAMEWORKS_DIR"
 
 cp "$BUILD_DIR/$EXECUTABLE_NAME" "$MACOS_DIR/$EXECUTABLE_NAME"
+
+# NVDA wave files played for remote sound cues (browse/focus mode and others).
+mkdir -p "$CONTENTS_DIR/Resources"
+cp -R "$ROOT_DIR/Sources/VONVDARemote/Sounds" "$CONTENTS_DIR/Resources/"
 
 if [[ -d "$BUILD_DIR/Sparkle.framework" ]]; then
   cp -R "$BUILD_DIR/Sparkle.framework" "$FRAMEWORKS_DIR/"

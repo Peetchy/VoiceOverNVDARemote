@@ -34,7 +34,10 @@ let package = Package(
             dependencies: [
                 "MacRemoteCore",
                 .product(name: "Sparkle", package: "Sparkle"),
-            ]
+            ],
+            // Copied into the app bundle by scripts/build_app.sh (SwiftPM resource
+            // bundles are not found once the executable moves into an .app).
+            exclude: ["Sounds"]
         ),
         .executableTarget(
             name: "RelayProbe",

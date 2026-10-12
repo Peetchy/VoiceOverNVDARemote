@@ -30,3 +30,16 @@ dist/
 DerivedData/
 *.xcworkspace
 *.xcodeproj
+
+# Secrets and signing material (this repository is public)
+keys/
+*.pem
+*.p8
+*.p12
+*.key
+*.cer
+*.mobileprovision
+*.provisionprofile
+.env
+.env.*
+.claude/settings.local.json

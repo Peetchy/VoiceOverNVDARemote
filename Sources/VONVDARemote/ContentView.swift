@@ -5,11 +5,10 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var controller: RemoteSessionController
-    @StateObject private var soundPlayer = SessionSoundPlayer()
 
     @State private var host = "nvdaremote.com"
     @State private var port = "6837"
-    @State private var key = "0871234321"
+    @State private var key = ""
     @State private var captureScope: KeyCaptureScope = .session
     @State private var globalHotKey: GlobalToggleHotKeyOption = .controlShiftCommandR
     @State private var speechOutputMode: SpeechOutputMode = .voiceOver
@@ -18,43 +17,31 @@ struct ContentView: View {
     @State private var showingCalibration = false
 
     var body: some View {
-        HStack(spacing: 20) {
+        ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                connectionPanel
-                statusPanel
-                toolsPanel
-            }
-            .frame(maxWidth: 360, maxHeight: .infinity, alignment: .topLeading)
+                statusBanner
 
-            VStack(alignment: .leading, spacing: 20) {
-                if canShowConnectedDetails {
-                    peerPanel
+                if isConnectedLike {
+                    commandsSection
                 } else {
-                    ContentUnavailableView(
-                        "No Active Session",
-                        systemImage: "rectangle.connected.to.line.below",
-                        description: Text("Connected peers and session details will appear after the remote session is established.")
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    connectionSection
                 }
+
+                if shouldShowAccessibilityWarning {
+                    accessibilityWarning
+                }
+
+                settingsSection
+                toolsSection
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(24)
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity)
         }
-        .padding(24)
-        .background(
-            LinearGradient(
-                colors: [Color(red: 0.94, green: 0.95, blue: 0.91), Color(red: 0.83, green: 0.88, blue: 0.81)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
         .onAppear {
             captureScope = controller.snapshot.keyCaptureScope
             globalHotKey = controller.snapshot.globalToggleHotKey
             speechOutputMode = controller.snapshot.speechOutputMode
-        }
-        .onChange(of: controller.snapshot.phase) { oldValue, newValue in
-            soundPlayer.playTransition(from: oldValue, to: newValue)
         }
         .sheet(isPresented: $showingEventLog) {
             EventLogSheet(records: controller.snapshot.eventLog)
@@ -72,234 +59,324 @@ struct ContentView: View {
         }
     }
 
-    private var connectionPanel: some View {
-        GroupBox("Connection") {
-            VStack(alignment: .leading, spacing: 12) {
-                if connectionInputsEnabled {
-                    TextField("Host", text: $host)
-                    TextField("Port", text: $port)
-                    SecureField("Session Key", text: $key)
-                } else {
-                    Text("Connected to \(host):\(port)")
-                        .font(.headline)
-                    Text("Session key is hidden while connected")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+    // MARK: - Status
 
-                Text("While controlling, local key events are captured. Use the configured global toggle hotkey to return control to this Mac.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                selectionRow(
-                    title: "Capture Scope",
-                    value: captureScope.displayName
-                ) {
-                    ForEach(KeyCaptureScope.allCases, id: \.self) { scope in
-                        Button(scope.displayName) {
-                            captureScope = scope
-                            controller.setKeyCaptureScope(scope)
-                        }
-                    }
-                }
-
-                selectionRow(
-                    title: "Global Hotkey",
-                    value: globalHotKey.displayName
-                ) {
-                    ForEach(GlobalToggleHotKeyOption.allCases, id: \.self) { option in
-                        Button(option.displayName) {
-                            globalHotKey = option
-                            controller.setGlobalToggleHotKey(option)
-                        }
-                    }
-                }
-
-                selectionRow(
-                    title: "Speech Output",
-                    value: speechOutputMode.displayName
-                ) {
-                    ForEach(SpeechOutputMode.allCases, id: \.self) { mode in
-                        Button(mode.displayName) {
-                            speechOutputMode = mode
-                            controller.setSpeechOutputMode(mode)
-                        }
-                    }
-                }
-
-                Button("Custom Keymap") {
-                    showingKeymapEditor = true
-                }
-
-                if shouldShowAccessibilityWarning {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Whole Session needs Accessibility access before it can capture keys.", systemImage: "hand.raised.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.orange)
-                        HStack {
-                            Button("Refresh Access") {
-                                controller.refreshAccessibilityPermission()
-                            }
-                            Button("Open Settings") {
-                                controller.openAccessibilitySettings()
-                            }
-                        }
-                    }
-                }
-
-                Button(connectionButtonTitle) {
-                    Task {
-                        if isConnectedLike {
-                            await controller.disconnect()
-                        } else {
-                            await controller.connect(host: host, port: UInt16(port) ?? 6837, key: key)
-                        }
-                    }
-                }
-                .keyboardShortcut(.defaultAction)
-                .tint(isConnectedLike ? .red : .accentColor)
-                .buttonStyle(.borderedProminent)
-
-                if canShowConnectedActions {
-                    HStack {
-                        Button(controlButtonTitle) {
-                            controller.toggleControl()
-                        }
-                        .disabled(!canToggleControl)
-
-                        Button("Send F11") {
-                            Task {
-                                await controller.sendRemoteKey(vkCode: 0x7A, scanCode: 0x57, extended: false, pressed: true)
-                                await controller.sendRemoteKey(vkCode: 0x7A, scanCode: 0x57, extended: false, pressed: false)
-                            }
-                        }
-                        .disabled(!canUseConnectedCommands)
-
-                        Button("Push Clipboard") {
-                            Task {
-                                await controller.pushClipboard()
-                            }
-                        }
-                        .disabled(!canUseConnectedCommands)
-
-                        Button("Copy Last Text") {
-                            controller.copyLatestTextToClipboard()
-                        }
-                        .disabled(!canCopyLatestText)
-
-                        Button("Ping") {
-                            Task {
-                                await controller.sendPing()
-                            }
-                        }
-                    }
-                }
-            }
-            .textFieldStyle(.roundedBorder)
-        }
-    }
-
-    private var statusPanel: some View {
-        GroupBox("Session State") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(phaseLabel)
-                    .font(.title3.weight(.semibold))
-                if canShowConnectedDetails {
-                    Text("Peers: \(controller.snapshot.peers.count)")
-                    Text("Key capture: \(controller.snapshot.keyCaptureActive ? "active" : "inactive")")
-                    if controller.snapshot.keyCaptureScope == .application && controller.snapshot.keyCaptureActive {
-                        Text("App-only capture is live. Keep VO NVDA Remote frontmost while sending keys.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Button("Send Ctrl+Alt+Del") {
-                        Task {
-                            await controller.sendCtrlAltDelete()
-                        }
-                    }
-                    .disabled(!canUseConnectedCommands)
-                } else {
-                    Text("Remote actions and session details will appear after the connection is established.")
-                        .font(.caption)
+    private var statusBanner: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: statusSymbol)
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(statusColor)
+                    .frame(width: 40)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(statusTitle)
+                        .font(.title2.weight(.semibold))
+                    Text(statusDetail)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
 
-    private var toolsPanel: some View {
-        GroupBox("Tools") {
-            VStack(alignment: .leading, spacing: 10) {
-                Button("Calibration") {
-                    showingCalibration = true
-                }
-                Button("Event Flow") {
-                    showingEventLog = true
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
+            if isConnectedLike {
+                HStack(spacing: 12) {
+                    Button {
+                        controller.toggleControl()
+                    } label: {
+                        Label(controlButtonTitle, systemImage: isControlling ? "stop.fill" : "keyboard")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(isControlling ? .orange : .accentColor)
+                    .keyboardShortcut(.defaultAction)
 
-    private var peerPanel: some View {
-        GroupBox("Connected Peers") {
-            List(controller.snapshot.peers) { peer in
-                HStack {
-                    Text("Client \(peer.id)")
-                    Spacer()
-                    Text(peer.connectionType.rawValue)
-                        .foregroundStyle(.secondary)
+                    Button(role: .destructive) {
+                        Task { await controller.disconnect() }
+                    } label: {
+                        Label("Disconnect", systemImage: "xmark.circle")
+                    }
+                    .buttonStyle(.bordered)
                 }
+                .controlSize(.large)
             }
         }
+        .padding(18)
+        .background(statusColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(statusColor.opacity(0.35)))
     }
 
-    private func selectionRow<MenuContent: View>(
-        title: String,
-        value: String,
-        @ViewBuilder content: () -> MenuContent
-    ) -> some View {
-        HStack {
-            Text(title)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Menu {
-                content()
+    // MARK: - Sections
+
+    private var connectionSection: some View {
+        section("Connection") {
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                GridRow {
+                    Text("Host").gridColumnAlignment(.trailing).accessibilityHidden(true)
+                    TextField("Host", text: $host)
+                        .labelsHidden()
+                }
+                GridRow {
+                    Text("Port").accessibilityHidden(true)
+                    TextField("Port", text: $port)
+                        .labelsHidden()
+                        .frame(maxWidth: 120)
+                }
+                GridRow {
+                    Text("Session Key").accessibilityHidden(true)
+                    SecureField("Session Key", text: $key)
+                        .labelsHidden()
+                }
+            }
+            .textFieldStyle(.roundedBorder)
+            .disabled(controller.snapshot.phase == .connecting)
+
+            Button {
+                Task { await controller.connect(host: host, port: UInt16(port) ?? 6837, key: key) }
             } label: {
-                HStack(spacing: 8) {
-                    Text(value)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption)
-                }
+                Label(connectionButtonTitle, systemImage: "network")
+                    .frame(maxWidth: .infinity)
             }
-            .menuStyle(.borderlessButton)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .keyboardShortcut(.defaultAction)
+            .disabled(controller.snapshot.phase == .connecting || key.isEmpty)
         }
     }
 
-    private var phaseLabel: String {
+    private var commandsSection: some View {
+        section("Send to Remote Computer") {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 10)], spacing: 10) {
+                // Plain F12 is the default local control toggle, so it cannot be typed through.
+                commandButton("Send F12", systemImage: "f.cursive") {
+                    Task {
+                        await controller.sendRemoteKey(vkCode: 0x7B, scanCode: 0x58, extended: false, pressed: true)
+                        await controller.sendRemoteKey(vkCode: 0x7B, scanCode: 0x58, extended: false, pressed: false)
+                    }
+                }
+                commandButton("Send Ctrl+Alt+Del", systemImage: "lock.shield") {
+                    Task { await controller.sendCtrlAltDelete() }
+                }
+                commandButton("Push Clipboard", systemImage: "doc.on.clipboard") {
+                    Task { await controller.pushClipboard() }
+                }
+                commandButton("Copy Last Text", systemImage: "text.quote") {
+                    controller.copyLatestTextToClipboard()
+                }
+                .disabled(!canCopyLatestText)
+                commandButton("Ping", systemImage: "dot.radiowaves.left.and.right") {
+                    Task { await controller.sendPing() }
+                }
+            }
+        }
+    }
+
+    private var accessibilityWarning: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Whole Session needs Accessibility access before it can capture keys.", systemImage: "hand.raised.fill")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(.orange)
+            HStack {
+                Button("Open Settings") {
+                    controller.openAccessibilitySettings()
+                }
+                Button("Refresh Access") {
+                    controller.refreshAccessibilityPermission()
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var settingsSection: some View {
+        section("Settings") {
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                settingRow("Capture Scope") {
+                    Picker("Capture Scope", selection: $captureScope) {
+                        ForEach(KeyCaptureScope.allCases, id: \.self) { scope in
+                            Text(scope.displayName).tag(scope)
+                        }
+                    }
+                    .onChange(of: captureScope) { _, scope in
+                        controller.setKeyCaptureScope(scope)
+                    }
+                    .disabled(isControlling)
+                }
+                settingRow("Control Toggle Hotkey") {
+                    Picker("Control Toggle Hotkey", selection: $globalHotKey) {
+                        ForEach(GlobalToggleHotKeyOption.allCases, id: \.self) { option in
+                            Text(option.displayName).tag(option)
+                        }
+                    }
+                    .onChange(of: globalHotKey) { _, option in
+                        controller.setGlobalToggleHotKey(option)
+                    }
+                }
+                settingRow("Speech Output") {
+                    Picker("Speech Output", selection: $speechOutputMode) {
+                        ForEach(SpeechOutputMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .onChange(of: speechOutputMode) { _, mode in
+                        controller.setSpeechOutputMode(mode)
+                    }
+                }
+            }
+
+            Button {
+                showingKeymapEditor = true
+            } label: {
+                Label("Custom Keymap…", systemImage: "keyboard.badge.ellipsis")
+            }
+        }
+    }
+
+    private var toolsSection: some View {
+        section("Tools") {
+            HStack(spacing: 10) {
+                Button {
+                    showingEventLog = true
+                } label: {
+                    Label("Event Flow", systemImage: "list.bullet.rectangle")
+                }
+                Button {
+                    showingCalibration = true
+                } label: {
+                    Label("Calibration", systemImage: "slider.horizontal.3")
+                }
+            }
+        }
+    }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: 12) {
+                content()
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    private func settingRow<Control: View>(_ title: String, @ViewBuilder control: () -> Control) -> some View {
+        GridRow {
+            Text(title)
+                .gridColumnAlignment(.trailing)
+                .accessibilityHidden(true)
+            control()
+                .labelsHidden()
+                .frame(maxWidth: 260, alignment: .leading)
+        }
+    }
+
+    private func commandButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .controlSize(.large)
+    }
+
+    // MARK: - State
+
+    private var statusTitle: String {
         switch controller.snapshot.phase {
         case .idle:
-            "Idle"
+            "Not Connected"
         case .connecting:
-            "Connecting"
+            "Connecting…"
         case .connected:
-            "Connected as master"
+            hasRemoteComputer ? "Using This Mac" : "Waiting for Remote Computer"
         case .controlling:
-            "Controlling remote machine"
-        case let .failed(message):
-            "Failed: \(message)"
+            "Controlling Remote Computer"
+        case .failed:
+            "Connection Failed"
         }
+    }
+
+    private var statusDetail: String {
+        let hotkey = controller.snapshot.globalHotKeyDisplay
+        switch controller.snapshot.phase {
+        case .idle:
+            return "Enter the relay details below, then connect."
+        case .connecting:
+            return "Connecting to \(host):\(port)."
+        case .connected:
+            if hasRemoteComputer {
+                return "Connected to \(remoteComputerDescription) via \(host):\(port). Press \(hotkey) or Start Control to control it."
+            }
+            return "Connected to \(host):\(port). The remote NVDA has not joined the session yet."
+        case .controlling:
+            if controller.snapshot.keyCaptureScope == .application {
+                return "Keys go to \(remoteComputerDescription) while this window is in front. Press \(hotkey) to return to this Mac."
+            }
+            return "All keys go to \(remoteComputerDescription). Press \(hotkey) to return to this Mac."
+        case let .failed(message):
+            return message
+        }
+    }
+
+    private var remoteComputerDescription: String {
+        let peers = controller.snapshot.peers
+        switch peers.count {
+        case 0:
+            return "the remote computer"
+        case 1:
+            return "remote computer \(String(peers[0].id))"
+        default:
+            return "\(peers.count) remote computers"
+        }
+    }
+
+    private var statusSymbol: String {
+        switch controller.snapshot.phase {
+        case .idle:
+            "desktopcomputer"
+        case .connecting:
+            "arrow.triangle.2.circlepath"
+        case .connected:
+            hasRemoteComputer ? "checkmark.circle.fill" : "hourglass"
+        case .controlling:
+            "keyboard.fill"
+        case .failed:
+            "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var statusColor: Color {
+        switch controller.snapshot.phase {
+        case .idle:
+            .gray
+        case .connecting:
+            .orange
+        case .connected:
+            hasRemoteComputer ? .blue : .orange
+        case .controlling:
+            .green
+        case .failed:
+            .red
+        }
+    }
+
+    private var hasRemoteComputer: Bool {
+        !controller.snapshot.peers.isEmpty
+    }
+
+    private var isControlling: Bool {
+        controller.snapshot.phase == .controlling
     }
 
     private var controlButtonTitle: String {
-        switch controller.snapshot.phase {
-        case .controlling:
-            "Stop Control"
-        default:
-            "Start Control"
-        }
+        isControlling ? "Stop Control" : "Start Control"
     }
 
     private var isConnectedLike: Bool {
@@ -312,43 +389,11 @@ struct ContentView: View {
     }
 
     private var connectionButtonTitle: String {
-        switch controller.snapshot.phase {
-        case .connecting:
-            return "Connecting..."
-        case .connected, .controlling:
-            return "Disconnect"
-        case .idle, .failed:
-            return "Connect"
-        }
-    }
-
-    private var connectionInputsEnabled: Bool {
-        !isConnectedLike && controller.snapshot.phase != .connecting
-    }
-
-    private var canToggleControl: Bool {
-        switch controller.snapshot.phase {
-        case .connected, .controlling:
-            return true
-        case .idle, .connecting, .failed:
-            return false
-        }
-    }
-
-    private var canUseConnectedCommands: Bool {
-        isConnectedLike
+        controller.snapshot.phase == .connecting ? "Connecting…" : "Connect"
     }
 
     private var canCopyLatestText: Bool {
-        canUseConnectedCommands && !(controller.snapshot.latestAnnouncement?.isEmpty ?? true)
-    }
-
-    private var canShowConnectedActions: Bool {
-        isConnectedLike || controller.snapshot.phase == .connecting
-    }
-
-    private var canShowConnectedDetails: Bool {
-        isConnectedLike
+        !(controller.snapshot.latestAnnouncement?.isEmpty ?? true)
     }
 
     private var shouldShowAccessibilityWarning: Bool {

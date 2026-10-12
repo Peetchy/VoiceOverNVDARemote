@@ -6,7 +6,10 @@ struct RelayProbe {
     static func main() async {
         let arguments = CommandLine.arguments
         let host = arguments.dropFirst().first ?? "nvdaremote.com"
-        let key = arguments.dropFirst(2).first ?? "0871234321"
+        guard let key = arguments.dropFirst(2).first else {
+            print("usage: RelayProbe <host> <session-key> [port]")
+            exit(2)
+        }
         let port = UInt16(arguments.dropFirst(3).first ?? "6837") ?? 6837
 
         let controller = RemoteSessionController(transport: NVDAProtocolTransport())

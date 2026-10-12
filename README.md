@@ -19,27 +19,6 @@ This project is designed for VoiceOver users on macOS who need to connect to an 
 - Publishes public GitHub release assets and appcast feed
 - Supports app-only and whole-session key capture modes
 
-## Recommended VoiceOver setup
-
-Create a dedicated VoiceOver activity for `VO NVDA Remote` in VoiceOver Utility and use that activity when working with the app.
-
-Setup steps:
-
-1. Open `VoiceOver Utility` on macOS.
-2. Go to the `Activities` category.
-3. Create a new activity named `VO NVDA Remote`.
-4. Configure the activity so it is used with `VO NVDA Remote`.
-5. In that activity, set `VoiceOver modifier keys` to `Control + Option` only.
-6. In that activity, turn `Announce when the Caps Lock key is pressed` off.
-7. Save the activity and activate it before starting a remote control session.
-
-Recommended activity settings:
-
-- Set `VoiceOver modifier keys` to `Control + Option` only
-- Turn `Announce when the Caps Lock key is pressed` off
-
-This avoids conflicts between the NVDA key (`Caps Lock`) used by the remote Windows machine and the local VoiceOver key on macOS.
-
 ## How to use
 
 1. Launch the app.
@@ -66,7 +45,7 @@ After connecting, the host and port are still shown, but the session key is hidd
 Remote-only controls that appear after connection:
 
 - `Start Control` / `Stop Control`
-- `Send F11`
+- `Send F12`
 - `Push Clipboard`
 - `Copy Last Text`
 - `Ping`
@@ -137,7 +116,7 @@ export CODESIGN_IDENTITY="Developer ID Application: Your Name (9P4236SF25)"
 Probe a relay server:
 
 ```bash
-swift run RelayProbe nvdaremote.com 0871234321 6837
+swift run RelayProbe nvdaremote.com YOUR_SESSION_KEY 6837
 ```
 
 Probe app-only key capture locally:
@@ -153,6 +132,10 @@ swift run KeyCaptureProbe
 
 If `Whole Session` is selected and Accessibility access is missing, the app exposes controls to refresh permission state or open the relevant macOS settings page.
 
+Keys are forwarded one-to-one, the same way NVDA Remote's own controlling side does: every physical press (including auto-repeat) and release is sent in the order it happened.
+
+Using `Caps Lock` as the NVDA key in chords (for example `Caps Lock+T` or `Caps Lock+Ctrl+A`) requires `Input Monitoring` permission in System Settings > Privacy & Security, in both capture modes. Without it macOS only reports Caps Lock lock toggles, so the app can only send a standalone NVDA key tap and announces this when control starts. While controlling, the local Mac's Caps Lock state is restored after each press.
+
 ## Global toggle hotkey
 
 The toggle hotkey is configurable from the main window. Current options:
@@ -163,6 +146,7 @@ The toggle hotkey is configurable from the main window. Current options:
 This hotkey toggles remote control mode while the app is running.
 Default selection: `F12`.
 `F12` by itself toggles control locally, while `Caps Lock+F12` remains available for the remote NVDA command.
+Use the `Send F12` button to send a plain `F12` to the remote machine.
 
 ## Speech output
 
@@ -174,6 +158,16 @@ Remote speech output can be routed to either:
 This setting changes how incoming NVDA speech is presented on macOS, without changing the relay protocol itself.
 
 For the best experience with `VoiceOver` output, allow VoiceOver to be controlled by scripts in VoiceOver Utility so the app can reliably interact with VoiceOver during use.
+
+## Sound cues
+
+The app plays NVDA's own sounds on the Mac, like NVDA Remote does on a controlling Windows machine:
+
+- Sounds the remote NVDA plays, such as the browse mode / focus mode switch, errors, and suggestion sounds, are matched by file name and played from the bundled copies
+- Beeps the remote NVDA makes (for example progress bars) are synthesized locally with the same pitch, length and left/right balance
+- Session events: connected, remote machine joined (`controlling`), disconnected, clipboard pushed and clipboard received
+
+The bundled wave files in `Sources/VONVDARemote/Sounds` come from [NVDA](https://github.com/nvaccess/nvda) (`source/waves`), which is licensed under the GNU General Public License v2.
 
 ## Custom keymap
 
@@ -269,8 +263,8 @@ Release workflow file:
 Release trigger:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
 ## Public URLs

@@ -7,20 +7,52 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0FFB1950884A2108C8098A2F /* start.wav in Resources */ = {isa = PBXBuildFile; fileRef = 4E88B6FADB8A71272DA39DCF /* start.wav */; };
 		2772C98A5A565D6B085FE1AA /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = D85639D66CC02DFAC8696E23 /* App.swift */; };
+		2C0E3ADD41800E133E8A2AE7 /* browseMode.wav in Resources */ = {isa = PBXBuildFile; fileRef = E30B98ABA035826330F4E85B /* browseMode.wav */; };
+		303100419B3C71EFB623D1B6 /* disconnected.wav in Resources */ = {isa = PBXBuildFile; fileRef = 747B1670465DE3BAE4C9CD97 /* disconnected.wav */; };
+		4549E37CC8DA3CE30A7FD11C /* exit.wav in Resources */ = {isa = PBXBuildFile; fileRef = 40F3A52FF362D0ED405356EC /* exit.wav */; };
+		4A36F3E29D5C8617044AC419 /* controlling.wav in Resources */ = {isa = PBXBuildFile; fileRef = C746F81E4767DE5ED286481E /* controlling.wav */; };
+		54454FACDA61F31E812E9D88 /* error.wav in Resources */ = {isa = PBXBuildFile; fileRef = 3DE6E97FFF7114505DCA39E9 /* error.wav */; };
 		62F68B55E310DCDA59D0F711 /* SparkleSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A251E4F98FD1C8441515243 /* SparkleSupport.swift */; };
 		72531DDAB69814773BF711EE /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = EB51962EBC7C5655DC5CF17B /* Sparkle */; };
+		7A2CB15C0FF1621AE2759A0E /* controlled.wav in Resources */ = {isa = PBXBuildFile; fileRef = DAE20BF349DA47DAC3634A07 /* controlled.wav */; };
+		7E757E3B0AAA68D9D6DA4352 /* textError.wav in Resources */ = {isa = PBXBuildFile; fileRef = 21B55BBA7BB690722F5C503A /* textError.wav */; };
+		8A18D1F5BF462310C2D3264A /* connected.wav in Resources */ = {isa = PBXBuildFile; fileRef = F500DD31AD894FD68C270934 /* connected.wav */; };
 		8A222F31C98503152890D2AF /* RemoteProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = 80DAA6123792D23719AD11A7 /* RemoteProtocol */; };
+		8E499640355EF95D3D0C9DD5 /* clipboardPush.wav in Resources */ = {isa = PBXBuildFile; fileRef = 0E0075788BD19FC90AE27612 /* clipboardPush.wav */; };
+		9FAC39549983EDAFB9A21855 /* screenCurtainOff.wav in Resources */ = {isa = PBXBuildFile; fileRef = 1E93D9445CB3F53E363D5431 /* screenCurtainOff.wav */; };
+		AFCE987E8FE2683C3B52102D /* focusMode.wav in Resources */ = {isa = PBXBuildFile; fileRef = 77AE7E43900CF42651CB7D81 /* focusMode.wav */; };
 		B794E10EBE05C77C77FC72D4 /* MacRemoteCore in Frameworks */ = {isa = PBXBuildFile; productRef = 657C754282CE46B615B038B3 /* MacRemoteCore */; };
+		C3D607331503E773193081A3 /* suggestionsClosed.wav in Resources */ = {isa = PBXBuildFile; fileRef = 799C3026EC97921E1DC96B22 /* suggestionsClosed.wav */; };
+		D97088FFA69324EF2A81E3F1 /* clipboardReceive.wav in Resources */ = {isa = PBXBuildFile; fileRef = 49DD6A7AAF1BC738826AA8F5 /* clipboardReceive.wav */; };
+		DFC02D2A965670A518F4A775 /* screenCurtainOn.wav in Resources */ = {isa = PBXBuildFile; fileRef = F649111DAA3E20330EEF6BC3 /* screenCurtainOn.wav */; };
 		F6C4AC6D06C9850B61C01091 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17762D2D0DF1F3F6B721799E /* ContentView.swift */; };
+		FB1D89FCCBDF2D622B12F9DB /* suggestionsOpened.wav in Resources */ = {isa = PBXBuildFile; fileRef = BCED13AE87012963E562E4E2 /* suggestionsOpened.wav */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0E0075788BD19FC90AE27612 /* clipboardPush.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = clipboardPush.wav; sourceTree = "<group>"; };
 		0F1CA3113262D8A5851716DE /* VONVDARemoteApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VONVDARemoteApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		17762D2D0DF1F3F6B721799E /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		1E93D9445CB3F53E363D5431 /* screenCurtainOff.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = screenCurtainOff.wav; sourceTree = "<group>"; };
+		21B55BBA7BB690722F5C503A /* textError.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = textError.wav; sourceTree = "<group>"; };
 		3A251E4F98FD1C8441515243 /* SparkleSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleSupport.swift; sourceTree = "<group>"; };
+		3DE6E97FFF7114505DCA39E9 /* error.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = error.wav; sourceTree = "<group>"; };
+		40F3A52FF362D0ED405356EC /* exit.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = exit.wav; sourceTree = "<group>"; };
+		49DD6A7AAF1BC738826AA8F5 /* clipboardReceive.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = clipboardReceive.wav; sourceTree = "<group>"; };
+		4E88B6FADB8A71272DA39DCF /* start.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = start.wav; sourceTree = "<group>"; };
+		747B1670465DE3BAE4C9CD97 /* disconnected.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = disconnected.wav; sourceTree = "<group>"; };
+		77AE7E43900CF42651CB7D81 /* focusMode.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = focusMode.wav; sourceTree = "<group>"; };
+		799C3026EC97921E1DC96B22 /* suggestionsClosed.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = suggestionsClosed.wav; sourceTree = "<group>"; };
+		BCED13AE87012963E562E4E2 /* suggestionsOpened.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = suggestionsOpened.wav; sourceTree = "<group>"; };
+		C746F81E4767DE5ED286481E /* controlling.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = controlling.wav; sourceTree = "<group>"; };
 		D85639D66CC02DFAC8696E23 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		DAE20BF349DA47DAC3634A07 /* controlled.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = controlled.wav; sourceTree = "<group>"; };
 		E1F23850E6ED42C8CC42CC70 /* vo-nvda-remote */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "vo-nvda-remote"; path = .; sourceTree = SOURCE_ROOT; };
+		E30B98ABA035826330F4E85B /* browseMode.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = browseMode.wav; sourceTree = "<group>"; };
+		F500DD31AD894FD68C270934 /* connected.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = connected.wav; sourceTree = "<group>"; };
+		F649111DAA3E20330EEF6BC3 /* screenCurtainOn.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = screenCurtainOn.wav; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,6 +69,29 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0C300D762195B5ABA81E0FA2 /* Sounds */ = {
+			isa = PBXGroup;
+			children = (
+				E30B98ABA035826330F4E85B /* browseMode.wav */,
+				0E0075788BD19FC90AE27612 /* clipboardPush.wav */,
+				49DD6A7AAF1BC738826AA8F5 /* clipboardReceive.wav */,
+				F500DD31AD894FD68C270934 /* connected.wav */,
+				DAE20BF349DA47DAC3634A07 /* controlled.wav */,
+				C746F81E4767DE5ED286481E /* controlling.wav */,
+				747B1670465DE3BAE4C9CD97 /* disconnected.wav */,
+				3DE6E97FFF7114505DCA39E9 /* error.wav */,
+				40F3A52FF362D0ED405356EC /* exit.wav */,
+				77AE7E43900CF42651CB7D81 /* focusMode.wav */,
+				1E93D9445CB3F53E363D5431 /* screenCurtainOff.wav */,
+				F649111DAA3E20330EEF6BC3 /* screenCurtainOn.wav */,
+				4E88B6FADB8A71272DA39DCF /* start.wav */,
+				799C3026EC97921E1DC96B22 /* suggestionsClosed.wav */,
+				BCED13AE87012963E562E4E2 /* suggestionsOpened.wav */,
+				21B55BBA7BB690722F5C503A /* textError.wav */,
+			);
+			path = Sounds;
+			sourceTree = "<group>";
+		};
 		2FFF2D92D3B968DEFB366A6F /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -76,6 +131,7 @@
 				D85639D66CC02DFAC8696E23 /* App.swift */,
 				17762D2D0DF1F3F6B721799E /* ContentView.swift */,
 				3A251E4F98FD1C8441515243 /* SparkleSupport.swift */,
+				0C300D762195B5ABA81E0FA2 /* Sounds */,
 			);
 			path = VONVDARemote;
 			sourceTree = "<group>";
@@ -88,6 +144,7 @@
 			buildConfigurationList = D43DB991EF36BB3F8BFF2E67 /* Build configuration list for PBXNativeTarget "VONVDARemoteApp" */;
 			buildPhases = (
 				346945FDBF012CFC3709D83C /* Sources */,
+				C66A638913BDF05A2D65253C /* Resources */,
 				39682C8A390852E67F564E96 /* Frameworks */,
 			);
 			buildRules = (
@@ -142,6 +199,32 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		C66A638913BDF05A2D65253C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2C0E3ADD41800E133E8A2AE7 /* browseMode.wav in Resources */,
+				8E499640355EF95D3D0C9DD5 /* clipboardPush.wav in Resources */,
+				D97088FFA69324EF2A81E3F1 /* clipboardReceive.wav in Resources */,
+				8A18D1F5BF462310C2D3264A /* connected.wav in Resources */,
+				7A2CB15C0FF1621AE2759A0E /* controlled.wav in Resources */,
+				4A36F3E29D5C8617044AC419 /* controlling.wav in Resources */,
+				303100419B3C71EFB623D1B6 /* disconnected.wav in Resources */,
+				54454FACDA61F31E812E9D88 /* error.wav in Resources */,
+				4549E37CC8DA3CE30A7FD11C /* exit.wav in Resources */,
+				AFCE987E8FE2683C3B52102D /* focusMode.wav in Resources */,
+				9FAC39549983EDAFB9A21855 /* screenCurtainOff.wav in Resources */,
+				DFC02D2A965670A518F4A775 /* screenCurtainOn.wav in Resources */,
+				0FFB1950884A2108C8098A2F /* start.wav in Resources */,
+				C3D607331503E773193081A3 /* suggestionsClosed.wav in Resources */,
+				FB1D89FCCBDF2D622B12F9DB /* suggestionsOpened.wav in Resources */,
+				7E757E3B0AAA68D9D6DA4352 /* textError.wav in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		346945FDBF012CFC3709D83C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -172,7 +255,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.6;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.vo-nvda-remote.app";
 				PRODUCT_NAME = "VO NVDA Remote";
 				SDKROOT = macosx;
@@ -315,7 +398,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.6;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.vo-nvda-remote.app";
 				PRODUCT_NAME = "VO NVDA Remote";
 				SDKROOT = macosx;

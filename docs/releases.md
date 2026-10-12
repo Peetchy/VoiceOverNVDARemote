@@ -13,8 +13,8 @@ This repository is configured to publish public release assets through GitHub Re
 Push a tag like:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
 Or run the `Release` workflow manually from GitHub Actions using `workflow_dispatch`.

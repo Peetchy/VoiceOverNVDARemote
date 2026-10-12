@@ -725,526 +725,183 @@ final class MacRemoteCoreTests: XCTestCase {
     }
 
     @MainActor
-    func testCapsLockChordAutoReleasesAfterPrimaryKey() async throws {
+    func testCapsLockChordForwardsPhysicalOrder() async throws {
+        let events = [capsLockKey.pressedEvent, tKey.pressedEvent, tKey.releasedEvent, capsLockKey.releasedEvent]
+        try await assertCapturedChord(events, expected: events.map(\.payload))
+    }
+
+    @MainActor
+    func testHeldCapsLockAppliesToEveryKeyPressedWhileHeld() async throws {
+        // NVDA+T twice quickly spells the window title; Caps Lock must stay down for both.
+        let events = [
+            capsLockKey.pressedEvent,
+            tKey.pressedEvent, tKey.releasedEvent,
+            tKey.pressedEvent, tKey.releasedEvent,
+            capsLockKey.releasedEvent,
+        ]
+        try await assertCapturedChord(events, expected: events.map(\.payload))
+    }
+
+    @MainActor
+    func testCapsLockReleaseDoesNotArmNextPlainKey() async throws {
+        let baseTime = ProcessInfo.processInfo.systemUptime
+        let events: [CapturedKeyEvent] = [
+            .init(vkCode: 0x14, scanCode: 0x3A, pressed: true, eventTime: baseTime + 0.00),
+            .init(vkCode: 0x54, scanCode: 0x14, pressed: true, eventTime: baseTime + 0.01),
+            .init(vkCode: 0x54, scanCode: 0x14, pressed: false, eventTime: baseTime + 0.02),
+            .init(vkCode: 0x14, scanCode: 0x3A, pressed: false, eventTime: baseTime + 0.20),
+            .init(vkCode: 0x41, scanCode: 0x1E, pressed: true, eventTime: baseTime + 0.30),
+            .init(vkCode: 0x41, scanCode: 0x1E, pressed: false, eventTime: baseTime + 0.31),
+        ]
+        let sent = try await capturedKeyPayloads(events)
+        XCTAssertEqual(sent, events.map(\.payload))
+    }
+
+    @MainActor
+    func testCapsLockCtrlAChordForwardsPhysicalOrder() async throws {
+        let events = [
+            capsLockKey.pressedEvent, controlKey.pressedEvent,
+            aKey.pressedEvent, aKey.releasedEvent,
+            controlKey.releasedEvent, capsLockKey.releasedEvent,
+        ]
+        try await assertCapturedChord(events, expected: events.map(\.payload))
+    }
+
+    @MainActor
+    func testChordReleasedInAnyOrderForwardsPhysicalOrder() async throws {
+        let events = [
+            controlKey.pressedEvent, capsLockKey.pressedEvent,
+            aKey.pressedEvent, capsLockKey.releasedEvent,
+            controlKey.releasedEvent, aKey.releasedEvent,
+        ]
+        try await assertCapturedChord(events, expected: events.map(\.payload))
+    }
+
+    @MainActor
+    func testStandaloneCapsLockTapForwardsPressAndRelease() async throws {
+        let events = [capsLockKey.pressedEvent, capsLockKey.releasedEvent]
+        let sent = try await capturedKeyPayloads(events)
+        XCTAssertEqual(sent, events.map(\.payload))
+    }
+
+    @MainActor
+    func testReleaseWithoutForwardedPressIsIgnored() async throws {
+        let sent = try await capturedKeyPayloads([
+            capsLockKey.releasedEvent,
+            tKey.pressedEvent,
+            tKey.releasedEvent,
+        ])
+        XCTAssertEqual(sent, [tKey.pressedPayload, tKey.releasedPayload])
+    }
+
+    @MainActor
+    func testCapsLockF12ForwardsRemoteGestureWithoutTogglingLocally() async throws {
+        let f12Down = CapturedKeyEvent(vkCode: 0x7B, scanCode: 0x58, pressed: true, isToggleHotKey: true)
+        let f12Up = CapturedKeyEvent(vkCode: 0x7B, scanCode: 0x58, pressed: false)
+        let events = [capsLockKey.pressedEvent, f12Down, f12Up, capsLockKey.releasedEvent]
+        try await assertCapturedChord(events, expected: events.map(\.payload))
+    }
+
+    @MainActor
+    func testAutoRepeatForwardsEveryKeyDown() async throws {
+        let rightArrow = DocumentedGestureKey(0x27)
+        let events = [
+            rightArrow.pressedEvent, rightArrow.pressedEvent, rightArrow.pressedEvent,
+            rightArrow.releasedEvent,
+        ]
+        let sent = try await capturedKeyPayloads(events)
+        XCTAssertEqual(sent, events.map(\.payload))
+    }
+
+    @MainActor
+    func testCaptureInterruptionReleasesHeldRemoteKeys() async throws {
         let transport = MockTransport()
         let keyCapture = MockKeyCapture()
-        let controller = RemoteSessionController(
-            transport: transport,
-            announcer: MockAnnouncer(),
-            clipboard: MockClipboard(),
-            keyCapture: keyCapture,
-            permissionChecker: MockPermissionChecker(isTrusted: true),
-            globalHotKeyManager: MockGlobalHotKeyManager(),
-            settingsStore: MockSettingsStore()
-        )
+        let controller = makeController(transport: transport, keyCapture: keyCapture)
 
         await controller.connect(using: sampleConfiguration(role: .master))
         await settle()
         controller.toggleControl()
-        keyCapture.emit(.init(vkCode: 0x14, scanCode: 0x3A, pressed: true))
-        keyCapture.emit(.init(vkCode: 0x54, scanCode: 0x14, pressed: true))
-        keyCapture.emit(.init(vkCode: 0x54, scanCode: 0x14, pressed: false))
+        keyCapture.emit(controlKey.pressedEvent)
+        keyCapture.emit(aKey.pressedEvent)
+        keyCapture.interrupt()
+        // The physical release arrives after the remote keys were already released.
+        keyCapture.emit(aKey.releasedEvent)
         await settle()
 
-        assertTrailingKeySequence(
-            transport.sentMessages,
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-            ]
+        let sent = keyPayloads(transport.sentMessages)
+        XCTAssertEqual(Array(sent.prefix(2)), [controlKey.pressedPayload, aKey.pressedPayload])
+        let releases = sent.dropFirst(2)
+        XCTAssertEqual(releases.count, 2)
+        XCTAssertEqual(
+            Set(releases.map { DocumentedGestureKey($0.vkCode, extended: $0.extended) }),
+            [controlKey, aKey]
         )
+        XCTAssertTrue(releases.allSatisfy { !$0.pressed })
+        XCTAssertEqual(controller.snapshot.phase, .controlling)
     }
 
     @MainActor
-    func testCapsLockStandaloneTapStillReleases() async throws {
+    func testTransportDisconnectStopsKeyCapture() async throws {
         let transport = MockTransport()
         let keyCapture = MockKeyCapture()
-        let controller = RemoteSessionController(
-            transport: transport,
-            announcer: MockAnnouncer(),
-            clipboard: MockClipboard(),
-            keyCapture: keyCapture,
-            permissionChecker: MockPermissionChecker(isTrusted: true),
-            globalHotKeyManager: MockGlobalHotKeyManager(),
-            settingsStore: MockSettingsStore()
-        )
+        let controller = makeController(transport: transport, keyCapture: keyCapture)
 
         await controller.connect(using: sampleConfiguration(role: .master))
         await settle()
         controller.toggleControl()
-        keyCapture.emit(.init(vkCode: 0x14, scanCode: 0x3A, pressed: true))
-        keyCapture.emit(.init(vkCode: 0x14, scanCode: 0x3A, pressed: false))
+        let stopsBefore = keyCapture.stopCallCount
+        transport.emit(.disconnected("Connection reset"))
         await settle()
 
-        assertTrailingKeySequence(
-            transport.sentMessages,
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-            ]
-        )
+        XCTAssertGreaterThan(keyCapture.stopCallCount, stopsBefore)
+        XCTAssertFalse(controller.snapshot.keyCaptureActive)
+        XCTAssertEqual(controller.snapshot.phase, .failed("Connection reset"))
     }
 
     @MainActor
-    func testCapsLockCtrlVChordReleasesCapsLockButKeepsControlScopedToChord() async throws {
-        let transport = MockTransport()
+    func testMissingPhysicalCapsLockIsReportedWhenControlStarts() async throws {
         let keyCapture = MockKeyCapture()
-        let controller = RemoteSessionController(
-            transport: transport,
-            announcer: MockAnnouncer(),
-            clipboard: MockClipboard(),
-            keyCapture: keyCapture,
-            permissionChecker: MockPermissionChecker(isTrusted: true),
-            globalHotKeyManager: MockGlobalHotKeyManager(),
-            settingsStore: MockSettingsStore()
-        )
+        keyCapture.isPhysicalCapsLockAvailable = false
+        let controller = makeController(transport: MockTransport(), keyCapture: keyCapture)
 
         await controller.connect(using: sampleConfiguration(role: .master))
         await settle()
         controller.toggleControl()
-        keyCapture.emit(.init(vkCode: 0x14, scanCode: 0x3A, pressed: true))
-        keyCapture.emit(.init(vkCode: 0xA2, scanCode: 0x1D, pressed: true))
-        keyCapture.emit(.init(vkCode: 0x56, scanCode: 0x2F, pressed: true))
-        keyCapture.emit(.init(vkCode: 0x56, scanCode: 0x2F, pressed: false))
-        keyCapture.emit(.init(vkCode: 0xA2, scanCode: 0x1D, pressed: false))
-        await settle()
 
-        assertTrailingKeySequence(
-            transport.sentMessages,
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: true),
-                .init(vkCode: 0x56, scanCode: 0x2F, extended: false, pressed: true),
-                .init(vkCode: 0x56, scanCode: 0x2F, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: false),
-            ]
-        )
+        XCTAssertTrue(controller.snapshot.eventLog.contains { $0.message.contains("Input Monitoring") })
     }
 
-    @MainActor
-    func testCapsLockAltTabChordReleasesCapsLockButKeepsAltScopedToChord() async throws {
-        let transport = MockTransport()
-        let keyCapture = MockKeyCapture()
-        let controller = RemoteSessionController(
-            transport: transport,
-            announcer: MockAnnouncer(),
-            clipboard: MockClipboard(),
-            keyCapture: keyCapture,
-            permissionChecker: MockPermissionChecker(isTrusted: true),
-            globalHotKeyManager: MockGlobalHotKeyManager(),
-            settingsStore: MockSettingsStore()
-        )
+    func testModifierTrackerReleasesLeftShiftWhileRightShiftHeld() {
+        var tracker = ModifierKeyTracker()
+        let shift = CGEventFlags.maskShift.rawValue
+        let leftShiftDevice: UInt64 = 0x02
+        let rightShiftDevice: UInt64 = 0x04
 
-        await controller.connect(using: sampleConfiguration(role: .master))
-        await settle()
-        controller.toggleControl()
-        keyCapture.emit(.init(vkCode: 0x14, scanCode: 0x3A, pressed: true))
-        keyCapture.emit(.init(vkCode: 0xA4, scanCode: 0x38, pressed: true))
-        keyCapture.emit(.init(vkCode: 0x09, scanCode: 0x0F, pressed: true))
-        keyCapture.emit(.init(vkCode: 0x09, scanCode: 0x0F, pressed: false))
-        keyCapture.emit(.init(vkCode: 0xA4, scanCode: 0x38, pressed: false))
-        await settle()
-
-        assertTrailingKeySequence(
-            transport.sentMessages,
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA4, scanCode: 0x38, extended: false, pressed: true),
-                .init(vkCode: 0x09, scanCode: 0x0F, extended: false, pressed: true),
-                .init(vkCode: 0x09, scanCode: 0x0F, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0xA4, scanCode: 0x38, extended: false, pressed: false),
-            ]
-        )
+        XCTAssertEqual(tracker.update(keyCode: 56, flags: shift | leftShiftDevice), true)
+        XCTAssertEqual(tracker.update(keyCode: 60, flags: shift | leftShiftDevice | rightShiftDevice), true)
+        XCTAssertEqual(tracker.update(keyCode: 56, flags: shift | rightShiftDevice), false)
+        XCTAssertEqual(tracker.update(keyCode: 60, flags: 0), false)
     }
 
-    @MainActor
-    func testCapsLockWindowsArrowChordReleasesCapsLockButKeepsWindowsScopedToChord() async throws {
-        let transport = MockTransport()
-        let keyCapture = MockKeyCapture()
-        let controller = RemoteSessionController(
-            transport: transport,
-            announcer: MockAnnouncer(),
-            clipboard: MockClipboard(),
-            keyCapture: keyCapture,
-            permissionChecker: MockPermissionChecker(isTrusted: true),
-            globalHotKeyManager: MockGlobalHotKeyManager(),
-            settingsStore: MockSettingsStore()
-        )
+    func testModifierTrackerIgnoresUnchangedAndUnknownKeys() {
+        var tracker = ModifierKeyTracker()
+        let control = CGEventFlags.maskControl.rawValue | 0x01
 
-        await controller.connect(using: sampleConfiguration(role: .master))
-        await settle()
-        controller.toggleControl()
-        keyCapture.emit(.init(vkCode: 0x14, scanCode: 0x3A, pressed: true))
-        keyCapture.emit(.init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: true))
-        keyCapture.emit(.init(vkCode: 0x25, scanCode: 0x4B, extended: true, pressed: true))
-        keyCapture.emit(.init(vkCode: 0x25, scanCode: 0x4B, extended: true, pressed: false))
-        keyCapture.emit(.init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: false))
-        await settle()
-
-        assertTrailingKeySequence(
-            transport.sentMessages,
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: true),
-                .init(vkCode: 0x25, scanCode: 0x4B, extended: true, pressed: true),
-                .init(vkCode: 0x25, scanCode: 0x4B, extended: true, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: false),
-            ]
-        )
+        XCTAssertNil(tracker.update(keyCode: 59, flags: 0))
+        XCTAssertEqual(tracker.update(keyCode: 59, flags: control), true)
+        XCTAssertNil(tracker.update(keyCode: 59, flags: control))
+        XCTAssertNil(tracker.update(keyCode: 0, flags: control))
     }
 
-    @MainActor
-    func testCapsLockCtrlAltVChordPreservesModifierOrderAndReleasesCapsLockAfterPrimaryKey() async throws {
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: true),
-                .init(vkCode: 0xA4, scanCode: 0x38, pressed: true),
-                .init(vkCode: 0x56, scanCode: 0x2F, pressed: true),
-                .init(vkCode: 0x56, scanCode: 0x2F, pressed: false),
-                .init(vkCode: 0xA4, scanCode: 0x38, pressed: false),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: false),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: true),
-                .init(vkCode: 0xA4, scanCode: 0x38, extended: false, pressed: true),
-                .init(vkCode: 0x56, scanCode: 0x2F, extended: false, pressed: true),
-                .init(vkCode: 0x56, scanCode: 0x2F, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0xA4, scanCode: 0x38, extended: false, pressed: false),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: false),
-            ]
-        )
-    }
+    func testModifierTrackerTogglesWhenDeviceBitsAreMissing() {
+        var tracker = ModifierKeyTracker()
+        let option = CGEventFlags.maskAlternate.rawValue
 
-    @MainActor
-    func testCapsLockCtrlWindowsArrowChordPreservesModifierOrderAndReleasesCapsLockAfterPrimaryKey() async throws {
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: true),
-                .init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: true),
-                .init(vkCode: 0x27, scanCode: 0x4D, extended: true, pressed: true),
-                .init(vkCode: 0x27, scanCode: 0x4D, extended: true, pressed: false),
-                .init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: false),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: false),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: true),
-                .init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: true),
-                .init(vkCode: 0x27, scanCode: 0x4D, extended: true, pressed: true),
-                .init(vkCode: 0x27, scanCode: 0x4D, extended: true, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: false),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: false),
-            ]
-        )
-    }
-
-    @MainActor
-    func testCapsLockAltWindowsArrowChordPreservesModifierOrderAndReleasesCapsLockAfterPrimaryKey() async throws {
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true),
-                .init(vkCode: 0xA4, scanCode: 0x38, pressed: true),
-                .init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: true),
-                .init(vkCode: 0x28, scanCode: 0x50, extended: true, pressed: true),
-                .init(vkCode: 0x28, scanCode: 0x50, extended: true, pressed: false),
-                .init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: false),
-                .init(vkCode: 0xA4, scanCode: 0x38, pressed: false),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA4, scanCode: 0x38, extended: false, pressed: true),
-                .init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: true),
-                .init(vkCode: 0x28, scanCode: 0x50, extended: true, pressed: true),
-                .init(vkCode: 0x28, scanCode: 0x50, extended: true, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0x5B, scanCode: 0x5B, extended: true, pressed: false),
-                .init(vkCode: 0xA4, scanCode: 0x38, extended: false, pressed: false),
-            ]
-        )
-    }
-
-    @MainActor
-    func testCapsLockCtrlAltDeleteChordPreservesModifierOrderAndReleasesCapsLockAfterPrimaryKey() async throws {
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: true),
-                .init(vkCode: 0xA4, scanCode: 0x38, pressed: true),
-                .init(vkCode: 0x2E, scanCode: 0x53, extended: true, pressed: true),
-                .init(vkCode: 0x2E, scanCode: 0x53, extended: true, pressed: false),
-                .init(vkCode: 0xA4, scanCode: 0x38, pressed: false),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: false),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: true),
-                .init(vkCode: 0xA4, scanCode: 0x38, extended: false, pressed: true),
-                .init(vkCode: 0x2E, scanCode: 0x53, extended: true, pressed: true),
-                .init(vkCode: 0x2E, scanCode: 0x53, extended: true, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0xA4, scanCode: 0x38, extended: false, pressed: false),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: false),
-            ]
-        )
-    }
-
-    @MainActor
-    func testCapsLockChordDoesNotLeakToNextPlainKeyWhenCapsLockReleaseIsMissing() async throws {
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-            ]
-        )
-    }
-
-    @MainActor
-    func testSecondCapsLockToggleOffStillStartsAnotherNVDAChord() async throws {
-        let baseTime = ProcessInfo.processInfo.systemUptime
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true, eventTime: baseTime + 0.00),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true, eventTime: baseTime + 0.01),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false, eventTime: baseTime + 0.02),
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: false, eventTime: baseTime + 0.20),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true, eventTime: baseTime + 0.21),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false, eventTime: baseTime + 0.22),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-            ]
-        )
-    }
-
-    @MainActor
-    func testSpuriousCapsLockReleaseDoesNotArmNextPlainKey() async throws {
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: false),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false),
-            ],
-            expected: [
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-            ]
-        )
-    }
-
-    @MainActor
-    func testAlternatingCapsLockToggleStatesStillProduceNVDAChordEveryTime() async throws {
-        let baseTime = ProcessInfo.processInfo.systemUptime
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true, eventTime: baseTime + 0.00),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true, eventTime: baseTime + 0.01),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false, eventTime: baseTime + 0.02),
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: false, eventTime: baseTime + 0.20),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true, eventTime: baseTime + 0.21),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false, eventTime: baseTime + 0.22),
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true, eventTime: baseTime + 0.40),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true, eventTime: baseTime + 0.41),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false, eventTime: baseTime + 0.42),
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: false, eventTime: baseTime + 0.60),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true, eventTime: baseTime + 0.61),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false, eventTime: baseTime + 0.62),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-            ]
-        )
-    }
-
-    @MainActor
-    func testAlternatingCapsLockToggleStatesStillProduceCapsShiftTEveryTime() async throws {
-        let baseTime = ProcessInfo.processInfo.systemUptime
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true, eventTime: baseTime + 0.00),
-                .init(vkCode: 0xA0, scanCode: 0x2A, pressed: true, eventTime: baseTime + 0.01),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true, eventTime: baseTime + 0.02),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false, eventTime: baseTime + 0.03),
-                .init(vkCode: 0xA0, scanCode: 0x2A, pressed: false, eventTime: baseTime + 0.04),
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: false, eventTime: baseTime + 0.20),
-                .init(vkCode: 0xA0, scanCode: 0x2A, pressed: true, eventTime: baseTime + 0.21),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true, eventTime: baseTime + 0.22),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false, eventTime: baseTime + 0.23),
-                .init(vkCode: 0xA0, scanCode: 0x2A, pressed: false, eventTime: baseTime + 0.24),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA0, scanCode: 0x2A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0xA0, scanCode: 0x2A, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA0, scanCode: 0x2A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0xA0, scanCode: 0x2A, extended: false, pressed: false),
-            ]
-        )
-    }
-
-    @MainActor
-    func testAlternatingCapsLockToggleStatesStillProduceCapsCtrlSEveryTime() async throws {
-        let baseTime = ProcessInfo.processInfo.systemUptime
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true, eventTime: baseTime + 0.00),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: true, eventTime: baseTime + 0.01),
-                .init(vkCode: 0x53, scanCode: 0x1F, pressed: true, eventTime: baseTime + 0.02),
-                .init(vkCode: 0x53, scanCode: 0x1F, pressed: false, eventTime: baseTime + 0.03),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: false, eventTime: baseTime + 0.04),
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: false, eventTime: baseTime + 0.20),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: true, eventTime: baseTime + 0.21),
-                .init(vkCode: 0x53, scanCode: 0x1F, pressed: true, eventTime: baseTime + 0.22),
-                .init(vkCode: 0x53, scanCode: 0x1F, pressed: false, eventTime: baseTime + 0.23),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: false, eventTime: baseTime + 0.24),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: true),
-                .init(vkCode: 0x53, scanCode: 0x1F, extended: false, pressed: true),
-                .init(vkCode: 0x53, scanCode: 0x1F, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: true),
-                .init(vkCode: 0x53, scanCode: 0x1F, extended: false, pressed: true),
-                .init(vkCode: 0x53, scanCode: 0x1F, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: false),
-            ]
-        )
-    }
-
-    @MainActor
-    func testAlternatingCapsLockToggleStatesStillProduceCapsCtrlShiftTEveryTime() async throws {
-        let baseTime = ProcessInfo.processInfo.systemUptime
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true, eventTime: baseTime + 0.00),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: true, eventTime: baseTime + 0.01),
-                .init(vkCode: 0xA0, scanCode: 0x2A, pressed: true, eventTime: baseTime + 0.02),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true, eventTime: baseTime + 0.03),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false, eventTime: baseTime + 0.04),
-                .init(vkCode: 0xA0, scanCode: 0x2A, pressed: false, eventTime: baseTime + 0.05),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: false, eventTime: baseTime + 0.06),
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: false, eventTime: baseTime + 0.20),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: true, eventTime: baseTime + 0.21),
-                .init(vkCode: 0xA0, scanCode: 0x2A, pressed: true, eventTime: baseTime + 0.22),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: true, eventTime: baseTime + 0.23),
-                .init(vkCode: 0x54, scanCode: 0x14, pressed: false, eventTime: baseTime + 0.24),
-                .init(vkCode: 0xA0, scanCode: 0x2A, pressed: false, eventTime: baseTime + 0.25),
-                .init(vkCode: 0xA2, scanCode: 0x1D, pressed: false, eventTime: baseTime + 0.26),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: true),
-                .init(vkCode: 0xA0, scanCode: 0x2A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0xA0, scanCode: 0x2A, extended: false, pressed: false),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: true),
-                .init(vkCode: 0xA0, scanCode: 0x2A, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: true),
-                .init(vkCode: 0x54, scanCode: 0x14, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0xA0, scanCode: 0x2A, extended: false, pressed: false),
-                .init(vkCode: 0xA2, scanCode: 0x1D, extended: false, pressed: false),
-            ]
-        )
-    }
-
-    @MainActor
-    func testAlternatingCapsLockToggleStatesStillProduceCapsF2EveryTime() async throws {
-        let baseTime = ProcessInfo.processInfo.systemUptime
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true, eventTime: baseTime + 0.00),
-                .init(vkCode: 0x71, scanCode: 0x3C, pressed: true, eventTime: baseTime + 0.01),
-                .init(vkCode: 0x71, scanCode: 0x3C, pressed: false, eventTime: baseTime + 0.02),
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: false, eventTime: baseTime + 0.20),
-                .init(vkCode: 0x71, scanCode: 0x3C, pressed: true, eventTime: baseTime + 0.21),
-                .init(vkCode: 0x71, scanCode: 0x3C, pressed: false, eventTime: baseTime + 0.22),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x71, scanCode: 0x3C, extended: false, pressed: true),
-                .init(vkCode: 0x71, scanCode: 0x3C, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x71, scanCode: 0x3C, extended: false, pressed: true),
-                .init(vkCode: 0x71, scanCode: 0x3C, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-            ]
-        )
-    }
-
-    @MainActor
-    func testCapsLockF12DoesNotToggleLocallyAndStillForwardsRemoteGesture() async throws {
-        try await assertCapturedChord(
-            [
-                .init(vkCode: 0x14, scanCode: 0x3A, pressed: true),
-                .init(vkCode: 0x7B, scanCode: 0x58, pressed: true, isToggleHotKey: true),
-                .init(vkCode: 0x7B, scanCode: 0x58, pressed: false),
-            ],
-            expected: [
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: true),
-                .init(vkCode: 0x7B, scanCode: 0x58, extended: false, pressed: true),
-                .init(vkCode: 0x7B, scanCode: 0x58, extended: false, pressed: false),
-                .init(vkCode: 0x14, scanCode: 0x3A, extended: false, pressed: false),
-            ]
-        )
+        XCTAssertEqual(tracker.update(keyCode: 58, flags: option), true)
+        XCTAssertEqual(tracker.update(keyCode: 61, flags: option), true)
+        XCTAssertEqual(tracker.update(keyCode: 58, flags: option), false)
+        XCTAssertEqual(tracker.update(keyCode: 61, flags: 0), false)
     }
 
     @MainActor
@@ -1277,6 +934,67 @@ final class MacRemoteCoreTests: XCTestCase {
             guard case let .key(payload) = $0.message else { return false }
             return payload.vkCode == 0x7B && payload.pressed
         })
+    }
+
+    func testWaveNameIsTakenFromRemoteWindowsPath() {
+        XCTAssertEqual(RemoteSessionController.waveName(fromRemotePath: #"C:\Program Files (x86)\NVDA\waves\browseMode.wav"#), "browseMode")
+        XCTAssertEqual(RemoteSessionController.waveName(fromRemotePath: "waves/focusMode.wav"), "focusMode")
+        XCTAssertEqual(RemoteSessionController.waveName(fromRemotePath: "textError"), "textError")
+    }
+
+    @MainActor
+    func testRemoteWaveAndTonePlayLocally() async throws {
+        let transport = MockTransport()
+        let soundPlayer = MockSoundPlayer()
+        let controller = makeController(transport: transport, keyCapture: MockKeyCapture(), soundPlayer: soundPlayer)
+
+        await controller.connect(using: sampleConfiguration(role: .master))
+        await settle()
+        transport.emit(.message(.init(message: .wave(fileName: #"C:\Program Files\NVDA\waves\focusMode.wav"#, asynchronous: true))))
+        transport.emit(.message(.init(message: .tone(hz: 880, length: 40, left: 50, right: 50))))
+        await settle()
+
+        XCTAssertEqual(soundPlayer.waves, ["focusMode"])
+        XCTAssertEqual(soundPlayer.tones.count, 1)
+        XCTAssertEqual(soundPlayer.tones.first?.hz, 880)
+        XCTAssertEqual(soundPlayer.tones.first?.length, 40)
+    }
+
+    @MainActor
+    func testSessionEventsPlayNVDARemoteCues() async throws {
+        let transport = MockTransport()
+        let soundPlayer = MockSoundPlayer()
+        let controller = makeController(transport: transport, keyCapture: MockKeyCapture(), soundPlayer: soundPlayer)
+
+        await controller.connect(using: sampleConfiguration(role: .master))
+        await settle()
+        transport.emit(.message(.init(message: .channelJoined(.init(channel: "room", clients: [])))))
+        transport.emit(.message(.init(message: .clientJoined(.init(client: .init(id: 7, connectionType: .slave))))))
+        transport.emit(.message(.init(message: .setClipboardText(.init(text: "from windows")))))
+        transport.emit(.message(.init(message: .clientLeft(.init(clientID: 7)))))
+        await settle()
+        await controller.disconnect()
+        // The cancelled connection reports a disconnect too; it must not play a second cue.
+        transport.emit(.disconnected(nil))
+        await settle()
+
+        XCTAssertEqual(soundPlayer.waves, ["connected", "controlling", "clipboardReceive", "disconnected", "disconnected"])
+    }
+
+    @MainActor
+    func testDroppedConnectionPlaysDisconnectedCueOnce() async throws {
+        let transport = MockTransport()
+        let soundPlayer = MockSoundPlayer()
+        let controller = makeController(transport: transport, keyCapture: MockKeyCapture(), soundPlayer: soundPlayer)
+
+        await controller.connect(using: sampleConfiguration(role: .master))
+        await settle()
+        transport.emit(.disconnected("Connection reset"))
+        transport.emit(.disconnected("Connection reset"))
+        await settle()
+
+        XCTAssertEqual(soundPlayer.waves, ["disconnected"])
+        XCTAssertEqual(controller.snapshot.phase, .failed("Connection reset"))
     }
 
     @MainActor
@@ -1335,6 +1053,50 @@ final class MacRemoteCoreTests: XCTestCase {
             file: file,
             line: line
         )
+    }
+
+    @MainActor
+    private func makeController(
+        transport: MockTransport,
+        keyCapture: MockKeyCapture,
+        soundPlayer: MockSoundPlayer = MockSoundPlayer()
+    ) -> RemoteSessionController {
+        RemoteSessionController(
+            transport: transport,
+            announcer: MockAnnouncer(),
+            soundPlayer: soundPlayer,
+            clipboard: MockClipboard(),
+            keyCapture: keyCapture,
+            permissionChecker: MockPermissionChecker(isTrusted: true),
+            globalHotKeyManager: MockGlobalHotKeyManager(),
+            settingsStore: MockSettingsStore()
+        )
+    }
+
+    private func keyPayloads(_ envelopes: [RemoteEnvelope]) -> [KeyPayload] {
+        envelopes.compactMap { envelope -> KeyPayload? in
+            if case let .key(payload) = envelope.message {
+                return payload
+            }
+            return nil
+        }
+    }
+
+    /// Emits the events in a fresh controlling session and returns every key payload sent.
+    @MainActor
+    private func capturedKeyPayloads(_ events: [CapturedKeyEvent]) async throws -> [KeyPayload] {
+        let transport = MockTransport()
+        let keyCapture = MockKeyCapture()
+        let controller = makeController(transport: transport, keyCapture: keyCapture)
+
+        await controller.connect(using: sampleConfiguration(role: .master))
+        await settle()
+        controller.toggleControl()
+        for event in events {
+            keyCapture.emit(event)
+        }
+        await settle()
+        return keyPayloads(transport.sentMessages)
     }
 
     @MainActor
@@ -1445,23 +1207,21 @@ private func documentedGestureEvents(for gesture: DocumentedNVDAGesture) -> [Cap
     return events
 }
 
+/// The remote machine must receive exactly the physical key sequence.
 private func documentedGestureExpectedSequence(for gesture: DocumentedNVDAGesture) -> [KeyPayload] {
-    var payloads: [KeyPayload] = []
-    if gesture.requiresNVDA {
-        payloads.append(capsLockKey.pressedPayload)
+    documentedGestureEvents(for: gesture).map(\.payload)
+}
+
+private extension CapturedKeyEvent {
+    var payload: KeyPayload {
+        .init(vkCode: vkCode, scanCode: scanCode, extended: extended, pressed: pressed)
     }
-    payloads.append(contentsOf: gesture.modifiers.map(\.pressedPayload))
-    payloads.append(gesture.primary.pressedPayload)
-    payloads.append(gesture.primary.releasedPayload)
-    if gesture.requiresNVDA {
-        payloads.append(capsLockKey.releasedPayload)
-    }
-    payloads.append(contentsOf: gesture.modifiers.reversed().map(\.releasedPayload))
-    return payloads
 }
 
 private let capsLockKey = DocumentedGestureKey(0x14, extended: false)
 private let shiftKey = DocumentedGestureKey(0xA0, extended: false)
+private let aKey = DocumentedGestureKey(0x41, extended: false)
+private let tKey = DocumentedGestureKey(0x54, extended: false)
 private let controlKey = DocumentedGestureKey(0xA2, extended: false)
 private let altKey = DocumentedGestureKey(0xA4, extended: false)
 private let numpad1Key = DocumentedGestureKey(0x61, extended: false)
@@ -1662,8 +1422,24 @@ private final class MockTransport: RemoteTransporting, @unchecked Sendable {
 }
 
 @MainActor
+private final class MockSoundPlayer: RemoteSoundPlaying {
+    private(set) var waves: [String] = []
+    private(set) var tones: [(hz: Double, length: Double)] = []
+
+    func playWave(named name: String) -> Bool {
+        waves.append(name)
+        return true
+    }
+
+    func playTone(hz: Double, lengthMilliseconds: Double, left: Double, right: Double) {
+        tones.append((hz, lengthMilliseconds))
+    }
+}
+
 private final class MockKeyCapture: KeyCaptureManaging {
     var onKeyEvent: ((CapturedKeyEvent) -> Void)?
+    var onCaptureInterrupted: (() -> Void)?
+    var isPhysicalCapsLockAvailable = true
     private(set) var startCallCount = 0
     private(set) var stopCallCount = 0
     private(set) var startedScopes: [KeyCaptureScope] = []
@@ -1686,6 +1462,10 @@ private final class MockKeyCapture: KeyCaptureManaging {
 
     func emit(_ event: CapturedKeyEvent) {
         onKeyEvent?(event)
+    }
+
+    func interrupt() {
+        onCaptureInterrupted?()
     }
 }
 
